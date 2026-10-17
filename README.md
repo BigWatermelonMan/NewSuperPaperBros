@@ -3,6 +3,13 @@
 A native PC port of **Super Paper Mario** (Wii, 2007), made by statically recompiling the game's PowerPC code to C++
 with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the game runs as a Windows program.
 
+![Flipside in cinematic 2.39:1 widescreen](screenshots/mac_02_cinematic.png)
+
+| | |
+|---|---|
+| ![Gloam Valley](screenshots/mi1_01.png) | ![Lineland Road](screenshots/he1_02.png) |
+| ![The Bitlands](screenshots/ta1_02.png) | ![Sammer's Kingdom](screenshots/wa1_02.png) |
+
 ## Features
 
 - Up to 4K, borderless 1080p by default
