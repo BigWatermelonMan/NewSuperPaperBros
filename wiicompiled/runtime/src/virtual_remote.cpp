@@ -403,9 +403,9 @@ bool Present(uint32_t chan) {
 // The Wii Remote's IR pointer. SPM reads KPAD pos / dpd_valid_fg straight from wpadmgr for Tippi's pointer, item
 // aiming and the HOME menu; a sideways remote is "pointing at the screen" only while the player aims it. Here the
 // right stick (any gamepad) or mouse movement over the window aims it, and it stays on screen for a moment after.
-// While the game's own cursor mode is on (wpadmgr_wp at r13-0x7D68 = 0x8056D1B8, flags bit 2: HOME menu), the
-// pointer stays up and the directions move it too.
-void UpdatePointer(const Intent& intent, WiiRemoteInput::KpadSample& sample) {
+// Never keep it up from the game's wpadmgr cursor flag (flags bit 2): seq_gameInit sets that for all gameplay, and a
+// pointer that is always on screen freezes Mario (he runs in place).
+void UpdatePointer(WiiRemoteInput::KpadSample& sample) {
     static float pos[2] = {0.0f, 0.0f};
     static uint64_t lastNs = 0, visibleUntilNs = 0;
     static float lastMouse[2] = {-1.0f, -1.0f};
@@ -423,19 +423,6 @@ void UpdatePointer(const Intent& intent, WiiRemoteInput::KpadSample& sample) {
         visibleUntilNs = now + kLingerNs;
         mouseAiming = fromMouse;
     };
-
-    uint32_t wp = 0, flags = 0;
-    const bool cursorMode = Memory::TryRead32(0x8056D1B8u, wp) && Memory::Contains(wp, 4) &&
-                            Memory::TryRead32(wp, flags) && (flags & 2u) != 0;
-    if (cursorMode) {
-        const float dx = ((intent.buttons & kScreenRight) ? 1.0f : 0.0f) - ((intent.buttons & kScreenLeft) ? 1.0f : 0.0f);
-        const float dy = ((intent.buttons & kScreenDown) ? 1.0f : 0.0f) - ((intent.buttons & kScreenUp) ? 1.0f : 0.0f);
-        if (dx != 0.0f || dy != 0.0f) {
-            pos[0] += dx * kStickSpeed * dt;
-            pos[1] += dy * kStickSpeed * dt;
-        }
-        visibleUntilNs = std::max(visibleUntilNs, now + 1);
-    }
 
     // Right stick of every gamepad (velocity).
     int count = 0;
@@ -525,7 +512,7 @@ bool Sample(uint32_t chan, WiiRemoteInput::KpadSample& sample) {
     sample = {};
     sample.hold = intent.buttons;
     ApplyMotion(g_motion[chan], intent, sample);
-    if (chan == 0) UpdatePointer(intent, sample);
+    if (chan == 0) UpdatePointer(sample);
     return true;
 }
 

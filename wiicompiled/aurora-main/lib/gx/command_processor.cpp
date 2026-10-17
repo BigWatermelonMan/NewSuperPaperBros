@@ -495,7 +495,10 @@ static void apply_xf_projection() {
   const float wide = g_widePerspectiveAspect.load(std::memory_order_relaxed);
   if (wide > 0.0f && raw[0] != 0.0f && raw[2] != 0.0f) {
     const float aspect = raw[2] / raw[0];
-    const bool screenSized = g_gxState.projType != GX_ORTHOGRAPHIC || 2.0f / raw[2] > 150.0f;
+    // Screen-sized = drawn into (about) the whole EFB; smaller viewports are render-to-texture work. The ortho
+    // height can't tell: SPM zooms its 2D camera in by shrinking it, which then went unwidened and stretched.
+    const auto& vp = g_gxState.xfViewport;
+    const bool screenSized = vp[0] * 2.0f >= 600.0f && -vp[1] * 2.0f >= 440.0f;
     if (aspect > 1.68f && aspect < 1.88f && screenSized) {
       widen = aspect / wide;
     }
@@ -1954,7 +1957,7 @@ static void handle_xf(const u8* data, u32& pos, u32 size, bool bigEndian) {
     if (viewportUpdated) {
       apply_xf_viewport();
     }
-    if (projectionUpdated) {
+    if (projectionUpdated || viewportUpdated) {  // the widening depends on both
       apply_xf_projection();
     }
   }
@@ -2872,8 +2875,9 @@ static bool handle_draw(u8 cmd, const u8* data, u32& pos, u32 size, bool bigEndi
   bool fullScreenQuad = false;
   if (g_spmProjWiden != 1.f && prim == GX_QUADS && vtxCount == 4) {
     float e[7];
+    // Only quads that match the view sideways (fills, curtains, cards); bigger ones (close-up sprites) keep the widening.
     fullScreenQuad = spm_draw_ndc_extent(fmt, data + pos, vtxCount, vtxSize, bigEndian, e) && e[0] <= -0.99f &&
-                     e[1] <= -0.99f && e[2] >= 0.99f && e[3] >= 0.99f;
+                     e[1] <= -0.99f && e[2] >= 0.99f && e[3] >= 0.99f && e[0] >= -1.05f && e[2] <= 1.05f;
     if (fullScreenQuad) g_gxState.stateDirty = true;  // its projection differs from its neighbours': never merge
   }
 

@@ -236,7 +236,7 @@ def run(args):
             env = os.environ.copy()
             env['SPM_MAP_SWEEP_FILE'] = str(remaining)
             env['SPM_MAP_SWEEP_SECONDS'] = str(args.seconds)
-            env['NSMBW_INPUT_SCRIPT'] = ','.join(f'{ms}:TWO:100' for ms in range(1000, 85000, 2000)) + ',5000:PLUS:100'
+            env['NSMBW_INPUT_SCRIPT'] = os.environ.get('SPM_SWEEP_INPUT') or ','.join(f'{ms}:TWO:100' for ms in range(1000, 85000, 2000)) + ',5000:PLUS:100'
             env.pop('NSMBW_SESSION_SCRIPT', None)
             env.pop('NSMBW_WARP', None)
             log = out / f'launch-{launches:03}.log'

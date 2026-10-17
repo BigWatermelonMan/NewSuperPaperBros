@@ -65,6 +65,7 @@ enum RawWiiButton : int {
 };
 
 // WPAD_BUTTON_* bits as the game reads them from KPADStatus.hold.
+constexpr uint32_t kScriptPoint = 0x40000000;  // not a WPAD bit: input_script "POINT"
 constexpr uint32_t kWpadLeft = 0x0001, kWpadRight = 0x0002, kWpadDown = 0x0004, kWpadUp = 0x0008,
                    kWpadPlus = 0x0010, kWpadTwo = 0x0100, kWpadOne = 0x0200, kWpadB = 0x0400, kWpadA = 0x0800,
                    kWpadMinus = 0x1000, kWpadZ = 0x2000, kWpadC = 0x4000, kWpadHome = 0x8000;
@@ -98,6 +99,7 @@ uint32_t ScriptButtonBit(const std::string& name) {
     if (name == "PLUS") return kWpadPlus;
     if (name == "MINUS") return kWpadMinus;
     if (name == "HOME") return kWpadHome;
+    if (name == "POINT") return kScriptPoint;  // test: remote aimed at the screen centre (emulated IR pointer)
     if (name == "UP") return kWpadUp;
     if (name == "DOWN") return kWpadDown;
     if (name == "LEFT") return kWpadLeft;
@@ -184,7 +186,8 @@ bool ScriptedSample(uint32_t chan, KpadSample& sample) {
     for (size_t i = 0; i < script.events.size(); ++i) {
         const ScriptEvent& event = script.events[i];
         if (event.chan == chan && now >= event.startMs && now < event.endMs) {
-            sample.hold |= event.bits;
+            sample.hold |= event.bits & ~kScriptPoint;
+            sample.pointerValid = sample.pointerValid || (event.bits & kScriptPoint) != 0;
             if (!announced[i]) {
                 announced[i] = true;
                 RT_LOGF(RT_TAG_RUNTIME, "scripted input at %llu ms: %s\n", static_cast<unsigned long long>(now),

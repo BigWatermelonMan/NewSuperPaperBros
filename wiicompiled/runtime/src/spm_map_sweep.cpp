@@ -22,6 +22,34 @@ namespace {
 using Clock = std::chrono::steady_clock;
 // Diagnostic (env SPM_MTX_SELFTEST): runs the game's own matrix/vector routines through the recompiled code and compares
 // with plain C++ math. Any "MISMATCH" line names a routine whose recompiled result is wrong.
+// SPM_MATH_SELFTEST=1: recompiled math helpers vs host math, logged as [mathtest] (movement debugging).
+void RunMathSelfTest(CpuContext* cpu) {
+    CpuContext a = *cpu;
+    a.gpr[3] = 0;
+    a.gpr[4] = 64;
+    InvokeIndirectCpu(0x801A5634, &a);  // __memAlloc(HEAP_MAIN, 64)
+    const uint32_t base = a.gpr[3];
+    if (!base || !Memory::Contains(base, 64)) return;
+    auto call = [&](uint32_t fn, std::initializer_list<double> f, uint32_t r3 = 0, uint32_t r4 = 0) {
+        CpuContext c = *cpu;
+        c.gpr[3] = r3; c.gpr[4] = r4;
+        int i = 1;
+        for (double d : f) c.fpr[i++].d = d;
+        InvokeIndirectCpu(fn, &c);
+        return c.fpr[1].d;
+    };
+    for (double d : {0.0, 0.5, 1.5707963, 2.0, 3.1415927, 4.712389, -1.5707963, 6.0}) {
+        RT_LOGF(RT_TAG_RUNTIME, "[mathtest] x=%g sin %g (host %g) cos %g (host %g) floor %g fmod2 %g\n", d, call(0x80261A5C, {d}), std::sin(d),
+                call(0x80261650, {d}), std::cos(d), call(0x80261724, {d}), call(0x80261BB4, {d, 2.0}));
+    }
+    for (double deg : {0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, -90.0, 450.0}) {
+        call(0x8019BA28, {deg}, base, base + 4);  // sincosf(angle, &s, &c)
+        RT_LOGF(RT_TAG_RUNTIME, "[mathtest] deg=%g sincosf s %g c %g | reviseAngle %g | angleABf(0,0,sin,-cos) %g\n", deg, Memory::ReadFloat32(base),
+                Memory::ReadFloat32(base + 4), call(0x8019B7A8, {deg}),
+                call(0x8019B874, {0.0, 0.0, std::sin(deg * 3.14159265 / 180), -std::cos(deg * 3.14159265 / 180)}));
+    }
+}
+
 void RunMtxSelfTest(CpuContext* cpu) {
     CpuContext a = *cpu;
     a.gpr[3] = 0;
@@ -277,6 +305,7 @@ struct Sweep {
                     Finish(3);
                 }
             }
+            { static bool mathDone = false; if (!mathDone && std::getenv("SPM_MATH_SELFTEST")) { mathDone = true; RunMathSelfTest(cpu); } }
             { static bool mtxDone = false; if (!mtxDone && std::getenv("SPM_MTX_SELFTEST")) { mtxDone = true; RunMtxSelfTest(cpu); } }
             if (time < holdUntil) return;
             const auto& name = maps[next++];
@@ -382,6 +411,21 @@ struct Sweep {
 } // namespace
 
 void Tick(CpuContext* cpu, uint32_t presentedFrames) {
+    // SPM_MARIO_LOG=1: Mario's position / speed / motion / buttons every 15 frames in a map (spm-headers MarioWork).
+    static const bool marioLog = std::getenv("SPM_MARIO_LOG") != nullptr;
+    uint32_t seq = 0;
+    if (marioLog && cpu && presentedFrames % 15 == 0 && Memory::TryRead32(kNowSeq, seq) && seq == 2) {
+        CpuContext call = *cpu;
+        InvokeIndirectCpu(0x801214EC, &call);  // marioGetPtr
+        const uint32_t mw = call.gpr[3];
+        if (Memory::Contains(mw, 0x320))
+            RT_LOGF(RT_TAG_RUNTIME, "[mario] f=%u pos %.2f %.2f %.2f xz %.3f walk %.2f mot %u sub %d held %04X rep %04X joy %u,%u ctrl %u keyoff %u flags %08X dir %.1f wpad %08X\n",
+                    presentedFrames, Memory::ReadFloat32(mw + 0x5C), Memory::ReadFloat32(mw + 0x60), Memory::ReadFloat32(mw + 0x64),
+                    Memory::ReadFloat32(mw + 0x148), Memory::ReadFloat32(mw + 0x14C), Memory::Read16(mw + 0x2C), int32_t(Memory::Read32(mw + 0x3C)),
+                    Memory::Read16(mw + 0x30C), Memory::Read16(mw + 0x310), Memory::Read8(mw + 0x316), Memory::Read8(mw + 0x317),
+                    Memory::Read8(mw + 0x34), Memory::Read8(mw + 0x35), Memory::Read32(mw), Memory::ReadFloat32(mw + 0x174),
+                    Memory::Contains(Memory::Read32(0x8056D1B8u), 4) ? Memory::Read32(Memory::Read32(0x8056D1B8u)) : 0u);
+    }
     static Sweep sweep;
     sweep.Tick(cpu, presentedFrames);
 }
