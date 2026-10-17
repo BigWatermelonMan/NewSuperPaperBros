@@ -491,9 +491,38 @@ sealed class MainForm : Form
         this.tipRow = tipRow;
         var row = new FlowLayoutPanel { AutoSize = true, Margin = Padding.Empty };
         row.Controls.Add(Btn("Open game folder", (_, _) => Process.Start("explorer.exe", play), Paper));
-        row.Controls.Add(Btn("Open saves folder", (_, _) => Process.Start("explorer.exe", Directory.CreateDirectory(Path.Combine(userData, "Saves")).FullName), Paper));
+        row.Controls.Add(Btn("Open saves folder", (_, _) => Process.Start("explorer.exe", Directory.CreateDirectory(WiiSave.DataDir(userData)).FullName), Paper));
+        row.Controls.Add(Btn("Import Wii / Dolphin save...", (_, _) => ImportSave(), Paper));
         body.Controls.Add(row);
         return card;
+    }
+
+    // A Wii save (data.bin from SD: Wii Menu > Data Management > Save Data > Copy) or a Dolphin save folder.
+    void ImportSave()
+    {
+        const string saveDir = @"Wii\title\00010000\52385045\data";
+        var dolphin = new[] { Environment.SpecialFolder.ApplicationData, Environment.SpecialFolder.MyDocuments }
+            .Select(f => Path.Combine(Environment.GetFolderPath(f), "Dolphin Emulator", saveDir)).FirstOrDefault(Directory.Exists);
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Choose a Super Paper Mario save: data.bin from a Wii's SD card, or wiimario00 in a Dolphin save folder",
+            Filter = "Wii or Dolphin save (data.bin, wiimario00)|data.bin;wiimario0*|All files|*.*",
+            InitialDirectory = dolphin ?? "",
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        var dataDir = WiiSave.DataDir(userData);
+        if (Directory.Exists(dataDir) && Directory.EnumerateFiles(dataDir).Any() &&
+            MessageBox.Show(this, "This replaces your current save files. They are kept as a backup next to them (data.backup-<date>).\n\nImport the save?",
+                "Import save", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+        try
+        {
+            var files = WiiSave.Import(dialog.FileName, dataDir);
+            MessageBox.Show(this, "Imported " + string.Join(", ", files) + ".", "Import save", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
+        {
+            MessageBox.Show(this, "The save could not be imported:\n" + e.Message, "Import save", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     static readonly string[] Tips =

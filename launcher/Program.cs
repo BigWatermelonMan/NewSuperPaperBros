@@ -28,6 +28,22 @@ static class Program
                 return 1;
             }
         }
+        // "--import-save <data.bin or a file in a Dolphin save folder> <data dir>": headless save import (exit 0 ok, 1 error).
+        if (args.Length == 3 && args[0] == "--import-save")
+        {
+            try { Console.WriteLine(string.Join(" ", WiiSave.Import(args[1], args[2]))); return 0; }
+            catch (Exception e) { Console.Error.WriteLine(e.Message); return 1; }
+        }
+        // "--savetest <save folder> <scratch dir>": the folder's files survive a data.bin round trip (exit 0 ok, 1 not).
+        if (args.Length == 3 && args[0] == "--savetest")
+        {
+            var files = Directory.GetFiles(args[1]).ToDictionary(Path.GetFileName, File.ReadAllBytes)!;
+            Directory.CreateDirectory(args[2]);
+            var bin = Path.Combine(args[2], "data.bin");
+            File.WriteAllBytes(bin, WiiSave.WriteDataBin(files!));
+            var back = WiiSave.ReadDataBin(File.ReadAllBytes(bin));
+            return back.Count == files.Count && files.All(f => back.TryGetValue(f.Key!, out var b) && b.AsSpan().SequenceEqual(f.Value)) ? 0 : 1;
+        }
         ApplicationConfiguration.Initialize();
         // "--screenshot <dir>" draws every page to <dir>\<page>.png and exits (visual check without the desktop).
         int shot = Array.IndexOf(args, "--screenshot");

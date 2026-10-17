@@ -481,6 +481,7 @@ static void apply_xf_viewport() {
 // NSMBW: the screen's aspect while the game's view is widened past 16:9 (0 = off). See below.
 std::atomic<float> g_widePerspectiveAspect{0.0f};
 static float g_spmProjWiden = 1.f;  // the horizontal factor the current projection was widened by
+float g_spmScreenWiden = 1.f;        // the same for the last screen-sized 16:9 view (texture copies use it)
 
 static void apply_xf_projection() {
   const auto& raw = g_gxState.xfProjection;
@@ -501,7 +502,10 @@ static void apply_xf_projection() {
     const bool screenSized = vp[0] * 2.0f >= 600.0f && -vp[1] * 2.0f >= 440.0f;
     if (aspect > 1.68f && aspect < 1.88f && screenSized) {
       widen = aspect / wide;
+      g_spmScreenWiden = widen;
     }
+  } else if (wide <= 0.0f) {
+    g_spmScreenWiden = 1.0f;
   }
   g_spmProjWiden = widen;
   proj.m0[0] = raw[0] * widen;

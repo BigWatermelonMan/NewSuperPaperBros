@@ -1,4 +1,5 @@
 extern "C" int g_spmBBoxArmed;
+namespace aurora::gx::fifo { extern float g_spmScreenWiden; }
 #include <atomic>
 #include "gx.hpp"
 #include "__gx.h"
@@ -487,7 +488,21 @@ void GXCopyTex(void* dest, GXBool clear) {
   if (aurora::gx::fifo::get_buffer_size() != 0) {
     aurora::gx::fifo::drain();
   }
-  const auto sourceRect = map_texture_copy_source(g_gxState.texCopySrc, g_gxState.texCopySrcRenderSpace);
+  auto sourceRect = map_texture_copy_source(g_gxState.texCopySrc, g_gxState.texCopySrcRenderSpace);
+  // SPM: with the view widened past 16:9 (Hor+), the game's screen coordinates squeeze toward the centre. A copy
+  // of part of the screen (the door-opening effect copies the door) must take the same squeeze to find it;
+  // full-width copies stay full-width, since what they're drawn back with covers the whole screen.
+  if (const float widen = aurora::gx::fifo::g_spmScreenWiden; widen < 1.f && !g_gxState.texCopySrcRenderSpace &&
+      g_gxState.texCopySrc.width < static_cast<int32_t>(aurora::gx::logical_fb_size().x)) {
+    const float cx = static_cast<float>(aurora::gfx::get_render_target_size().x) * 0.5f;
+    auto& sr = sourceRect.sampleRect;
+    sr.x() = cx + (sr.x() - cx) * widen;
+    sr.z() *= widen;
+    auto& cr = sourceRect.clearRect;
+    const auto left = static_cast<int32_t>(std::lround(sr.x()));
+    cr.width = std::max<int32_t>(static_cast<int32_t>(std::lround(sr.x() + sr.z())) - left, 1);
+    cr.x = left;
+  }
   const auto rect = sourceRect.clearRect;
   // Keep guest dimensions for cache identity while preserving scaled GPU detail.
   // NSMBW: a destination wider or taller than what the copy writes is a patch into a bigger texture

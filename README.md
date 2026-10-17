@@ -45,6 +45,10 @@ Start = +, Back or LB = -, right stick = pointer. Keyboard and mouse work too. C
 `files\` mirrors the disc (replacing game files) and/or `textures\` holds texture replacements. Tick or untick mods
 to switch them on and off.
 
+**Saves from a Wii or Dolphin:** on the launcher's **Play** page click **Import Wii / Dolphin save...** and pick
+`data.bin` (copied to an SD card from the Wii Menu's Data Management) or `wiimario00` in Dolphin's
+`Wii\title\00010000\52385045\data` folder. Your current save is kept as a backup.
+
 **Updating:** unzip a new release over the old folder. Your disc, saves, settings and mods are kept.
 
 ## Building from source
