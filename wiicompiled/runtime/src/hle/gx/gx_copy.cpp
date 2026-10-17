@@ -4,6 +4,7 @@
 
 #include "settings_overlay.h"
 
+#include <aurora/aurora.h>
 #include <dolphin/gx/GXAurora.h>
 
 #include <algorithm>
@@ -37,6 +38,29 @@ void RememberEfbCopyDestination(uint32_t addr, uint32_t size) {
 }
 
 } // namespace
+
+// A data-cache op over a GXCopyTex destination is the game about to read the copy with its CPU (SPM's offscreen
+// effects: doors, the 3D flip, character switches copy the screen, then DCFlushRange it and move the pixels into
+// their own buffers). Copies are GPU-only, so download any that are still pending into RAM first.
+void DownloadEfbCopiesForRange(uint32_t addr, uint32_t size) {
+    if (size == 0) {
+        return;
+    }
+    const uint64_t start = CanonicalizeGxMainRamAddress(addr);
+    const uint64_t end = start + size;
+    std::vector<uint32_t> overlapping;
+    {
+        std::lock_guard<std::mutex> guard(g_efbCopyDestinationsMutex);
+        const uint64_t earliest = start > g_largestEfbCopyDestination ? start - g_largestEfbCopyDestination : 0;
+        for (auto it = g_efbCopyDestinations.lower_bound(static_cast<uint32_t>(earliest));
+             it != g_efbCopyDestinations.end() && static_cast<uint64_t>(it->first) < end; ++it) {
+            if (static_cast<uint64_t>(it->first) + it->second > start) overlapping.push_back(it->first);
+        }
+    }
+    for (const uint32_t copyAddr : overlapping) {
+        aurora_flush_efb_copy_to_ram(GuestToHostPtr(copyAddr));  // no-op unless still pending
+    }
+}
 
 void InvalidateEfbCopyDestinationsForRange(uint32_t addr, uint32_t size) {
     if (size == 0) {

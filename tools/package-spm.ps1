@@ -1,12 +1,12 @@
-﻿# Builds the personal New Super Paper Bros. folder, dist\NewSuperPaperBros: self-contained, nothing from the dev tree.
-#   powershell -ExecutionPolicy Bypass -File tools\package-spm.ps1 [-Build] [-Zip]
+﻿# Builds New Super Paper Bros. and updates the player's game folder (-Install, default Desktop\My recomps\NewSuperPaperBros).
+#   powershell -ExecutionPolicy Bypass -File tools\package-spm.ps1 [-Build] [-Zip] [-Install <folder>]
 # -Build first rebuilds the game (build-spm.ps1 -SkipTools) and the launcher. -Zip also writes dist\NewSuperPaperBros.zip.
 # Layout: New Super Paper Bros.exe (launcher), README.txt, engine\ (nspb-engine.exe = Play\SuperPaperMario.exe renamed,
 # DLLs, startup\ sprites, wii_bootstrap\, game_files\ = built-in HQ music, UserData\ = saves/settings/mods + HD textures).
 # The disc is never copied in: the launcher extracts the player's image into Disc\ inside the folder.
-# A clean copy is staged in dist\_stage and copied over dist\NewSuperPaperBros, so the saves, Config.toml, mods and Disc\
-# already there are kept. The version is <Version> in launcher\NewSuperPaperBros.Launcher.csproj.
-[CmdletBinding()] param([switch]$Build, [switch]$Zip)
+# A clean copy is staged in dist\_stage (deleted afterwards) and copied over the game folder, so the saves, Config.toml,
+# mods and Disc\ already there are kept. The version is <Version> in launcher\NewSuperPaperBros.Launcher.csproj.
+[CmdletBinding()] param([switch]$Build, [switch]$Zip, [string]$Install = "$env:USERPROFILE\Desktop\My recomps\NewSuperPaperBros")
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $launcher = "$root\launcher\publish\New Super Paper Bros.exe"
@@ -14,7 +14,7 @@ if ($Build) { & "$PSScriptRoot\build-spm.ps1" -SkipTools; & "$PSScriptRoot\build
 elseif (-not (Test-Path -LiteralPath $launcher)) { & "$PSScriptRoot\build-launcher.ps1" }
 $version = 'v' + ([xml](Get-Content -LiteralPath "$root\launcher\NewSuperPaperBros.Launcher.csproj")).Project.PropertyGroup.Version
 function Mirror([string]$From, [string]$To) {
-    robocopy $From $To /E /NFL /NDL /NJH /NJS /NP | Out-Null
+    robocopy $From $To /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null  # few retries: a running game locks its files
     if ($LASTEXITCODE -ge 8) { throw "robocopy $From -> $To failed ($LASTEXITCODE)" }
 }
 function Remove-Tree([string]$Path) {
@@ -71,8 +71,8 @@ if ($Zip) {
     Write-Host "ZIP: $zipPath"
 }
 
-# Copy over the personal folder, keeping what is not in the build (saves, Config.toml, mods, Disc\).
-$dist = "$root\dist\NewSuperPaperBros"
+# Copy over the game folder, keeping what is not in the build (saves, Config.toml, mods, Disc\).
+$dist = $Install
 Mirror $stage $dist
 # Earlier layouts: the game in Play\ (carry the player's files into engine\UserData) and the public-release extras.
 if (Test-Path -LiteralPath "$dist\Play") {

@@ -64,6 +64,7 @@ void DcRangeOp(const char* label, uint32_t addr, uint32_t length)
         return;
     }
 
+    DownloadEfbCopiesForRange(range.start, range.size);
     GxNotifyGuestRamDmaWrite(range.start, range.size);
 }
 } // namespace
