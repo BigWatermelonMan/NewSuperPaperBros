@@ -405,6 +405,10 @@ bool Present(uint32_t chan) {
 // right stick (any gamepad) or mouse movement over the window aims it, and it stays on screen for a moment after.
 // Never keep it up from the game's wpadmgr cursor flag (flags bit 2): seq_gameInit sets that for all gameplay, and a
 // pointer that is always on screen freezes Mario (he runs in place).
+// Which device player 1 last pressed something on. While it's a gamepad the mouse never aims the pointer: a nudged
+// mouse (or one moved to start a screen recording) would bring Tippi's pointer up and freeze Mario mid-run.
+bool g_lastInputWasPad = false;
+
 void UpdatePointer(WiiRemoteInput::KpadSample& sample) {
     static float pos[2] = {0.0f, 0.0f};
     static uint64_t lastNs = 0, visibleUntilNs = 0;
@@ -445,8 +449,17 @@ void UpdatePointer(WiiRemoteInput::KpadSample& sample) {
         const SDL_MouseButtonFlags buttons = SDL_GetMouseState(&mx, &my);
         int w = 0, h = 0;
         if (SDL_GetWindowSize(window, &w, &h) && w > 0 && h > 0) {
-            if (mx != lastMouse[0] || my != lastMouse[1]) {
-                if (lastMouse[0] >= 0.0f) aim(true);
+            // Aim only on a real movement (several pixels), and only when keyboard/mouse is the device in use.
+            const float moved = std::fabs(mx - lastMouse[0]) + std::fabs(my - lastMouse[1]);
+            if (lastMouse[0] < 0.0f || g_lastInputWasPad) {
+                lastMouse[0] = mx;
+                lastMouse[1] = my;
+                if (g_lastInputWasPad && mouseAiming) {  // gamepad took over: drop the mouse's pointer now
+                    mouseAiming = false;
+                    visibleUntilNs = 0;
+                }
+            } else if (moved >= 6.0f) {
+                aim(true);
                 lastMouse[0] = mx;
                 lastMouse[1] = my;
             }
@@ -501,10 +514,14 @@ bool Sample(uint32_t chan, WiiRemoteInput::KpadSample& sample) {
         }
     };
     if (chan == 0 && !g_keyboardOnAPort) {
-        merge(KeyboardIntent());
+        const Intent keys = KeyboardIntent();
+        if (keys.buttons != 0 || keys.shake || keys.tilt != 0.0f) g_lastInputWasPad = false;
+        merge(keys);
     }
     if (chan == 0) {
-        merge(GamepadIntent());
+        const Intent pads = GamepadIntent();
+        if (pads.buttons != 0 || pads.shake || pads.tilt != 0.0f) g_lastInputWasPad = true;
+        merge(pads);
         merge(TouchIntent());
     }
     // No InputBlocked() check here: the startup cover must still see A/2, and frame_input.cpp / kpad.cpp blank the
