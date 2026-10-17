@@ -395,6 +395,8 @@ inline void EnsureConfigFile() {
               "resolution_multiplier = 2.25\n"
               "# 0 (off), 120 or 180\n"
               "frame_interpolation_fps = 120\n"
+              "# wait for the display when presenting: no screen tearing\n"
+              "vsync = true\n"
               "# 0 = original 4:3, 1 = 16:9, 2 = fill the screen, 3 = cinematic 2.39:1\n"
               "aspect_mode = 3\n"
               "display_mode = \"borderless\"\n"

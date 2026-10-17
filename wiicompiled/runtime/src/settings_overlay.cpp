@@ -121,7 +121,7 @@ bool g_skipUnreadyPipelines = RuntimeConfigFile::SkipUnreadyPipelines(true);
 bool g_disableCopyFilter = RuntimeConfigFile::DisableCopyFilter(true);
 bool g_showFps = RuntimeConfigFile::ShowFps(false);  // off unless turned on
 bool g_frameGraph = RuntimeConfigFile::FrameGraph(false);
-std::atomic<bool> g_vsync{RuntimeConfigFile::VSync(false)};
+std::atomic<bool> g_vsync{RuntimeConfigFile::VSync(true)};  // default on: no tearing
 #if defined(__APPLE__)
 bool g_metalFxSpatialUpscaling = RuntimeConfigFile::MetalFxSpatialUpscaling(false);
 #endif
@@ -1185,6 +1185,10 @@ void DrawGraphicsSettings() {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
     ImGui::TextDisabled("Frame interpolation is experimental, you might find visual artifacts");
     ImGui::PopTextWrapPos();
+    if (bool vsync = g_vsync.load(); ImGui::Checkbox("Vsync (no screen tearing)", &vsync)) {
+        SetVSync(vsync);
+        RuntimeConfigFile::SetVSync(vsync);
+    }
 #if defined(__APPLE__)
     const bool metalFxSupported = aurora_is_metalfx_spatial_supported();
     ImGui::BeginDisabled(!metalFxSupported);

@@ -159,7 +159,7 @@ sealed class MainForm : Form
     {
         bool changed = false;
         foreach (var (key, value) in new[] { ("display_mode", "\"borderless\""), ("resolution_multiplier", "2.25"), ("aspect_mode", "3"),
-                     ("frame_interpolation_fps", "120"), ("texture_replacements", "true"), ("widescreen", "true") })
+                     ("frame_interpolation_fps", "120"), ("texture_replacements", "true"), ("widescreen", "true"), ("vsync", "true") })
             if (config.Get("video", key) == null) { config.Set("video", key, value); changed = true; }
         // The HD textures are part of the port, not an option.
         if (config.Get("video", "texture_replacements") != "true") { config.Set("video", "texture_replacements", "true"); changed = true; }
@@ -552,6 +552,7 @@ sealed class MainForm : Form
         body.Controls.Add(Choice("Resolution", "resolution_multiplier", new[] { ("1080p", "2.25"), ("4K (2160p)", "4.5"), ("Match the screen", "0"), ("1440p", "3"), ("720p", "1.5"), ("480p (original)", "1") }));
         body.Controls.Add(Choice("Aspect ratio", "aspect_mode", new[] { ("Cinematic 2.39:1", "3"), ("Fill the screen", "2"), ("16:9", "1"), ("Original 4:3", "0") }));
         body.Controls.Add(Choice("Frame interpolation", "frame_interpolation_fps", new[] { ("120 FPS", "120"), ("180 FPS", "180"), ("Off (60 FPS)", "0") }));
+        body.Controls.Add(Choice("Vsync", "vsync", new[] { ("On (no screen tearing)", "true"), ("Off", "false") }));
         body.Controls.Add(Note("Changes are saved at once and used the next time the game starts. The same settings are in the game's F10 menu. " +
                                "Cinematic and Fill widen the game's camera (more of the level is visible); 16:9 keeps the Wii picture with bars on wider screens. " +
                                "Frame interpolation inserts frames between the game's 60 fps; turn it off if you see artifacts."));
