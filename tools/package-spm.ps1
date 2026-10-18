@@ -2,6 +2,7 @@
 #   powershell -ExecutionPolicy Bypass -File tools\package-spm.ps1 [-Build] [-Zip] [-Install <folder>]
 # -Build first rebuilds the game (build-spm.ps1 -SkipTools) and the launcher. -Zip also writes dist\NewSuperPaperBros.zip.
 # Layout: New Super Paper Bros.exe (launcher), README.txt, engine\ (nspb-engine.exe = Play\SuperPaperMario.exe renamed,
+# engine_usa.dll / engine_pal.dll = the recompiled game per disc region,
 # DLLs, startup\ sprites, wii_bootstrap\, game_files\ = built-in HQ music, UserData\ = saves/settings/mods + HD textures).
 # The disc is never copied in: the launcher extracts the player's image into Disc\ inside the folder.
 # A clean copy is staged in dist\_stage (deleted afterwards) and copied over the game folder, so the saves, Config.toml,
@@ -32,6 +33,9 @@ New-Item -ItemType Directory -Force "$engine\UserData\mods" | Out-Null
 Copy-Item -LiteralPath $launcher -Destination $stage
 # The game: runtime files only (no saves, logs, caches, debug *.disabled switches or the dev texture packs).
 Copy-Item -LiteralPath "$root\Play\SuperPaperMario.exe" -Destination "$engine\nspb-engine.exe"
+# The exe is the loader; the engine proper is one module per disc region (engine_usa.dll, engine_pal.dll from
+# build-spm.ps1 -Pal), copied with the other DLLs below.
+foreach ($m in 'engine_usa.dll', 'engine_pal.dll') { if (-not (Test-Path -LiteralPath "$root\Play\$m")) { throw "missing ${m}: run build-spm.ps1 (and -Pal)" } }
 foreach ($f in '*.dll', 'dsp_coef.bin', 'initial_pipeline_cache.db', 'portable.txt') { Copy-Item "$root\Play\$f" $engine }
 # Dawn (webgpu_dawn.dll) and dxcompiler.dll need the Visual C++ 2015-2022 runtime; ship it app-local (Microsoft's
 # redistributable files) so a PC without the VC++ Redistributable still starts the game.

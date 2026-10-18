@@ -1,7 +1,9 @@
 # New Super Paper Bros. - only sources, project files and scripts are tracked.
 # Game data (the user's own disc), the game's code, and everything built or downloaded stays out.
 /Disc/
+/Disc_PAL/
 /game/
+/game_pal/
 /toolchain/
 /autotest/
 /build-logs/
@@ -26,6 +28,7 @@ AGENTS.md
 
 # wiicompiled build output, downloaded dependencies and translator binaries
 /wiicompiled/generated/
+/wiicompiled/pal/
 /wiicompiled/native-build/
 /wiicompiled/build/
 /wiicompiled/Dependencies/

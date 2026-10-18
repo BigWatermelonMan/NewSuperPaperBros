@@ -106,11 +106,13 @@ std::string Problem(const fs::path& root) {
     }
     const std::string id(header, 6);
     const int revision = static_cast<unsigned char>(header[7]);
-    if (id != "R8PE01") {
-        return "That is " + id + ", not Super Paper Mario for the USA (R8PE01). This port runs "
-               "only the USA disc, revision 0.";
+    // projects/spm/pal/tools/make_pal_runtime.py rewrites these two for the PAL engine (R8PP01, any revision).
+    constexpr const char* kGameId = "R8PE01";
+    constexpr int kRevision = 0;
+    if (id != kGameId) {
+        return "That is " + id + ", not Super Paper Mario " + kGameId + ". This engine runs only that disc.";
     }
-    if (revision != 0) {
+    if (kRevision >= 0 && revision != kRevision) {
         return "That is Super Paper Mario revision " + std::to_string(revision) +
                ". This port runs only revision 0 (Dolphin shows it under Properties > Info).";
     }

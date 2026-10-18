@@ -141,6 +141,7 @@ sealed class MainForm : Form
 
     // The release keeps the game in engine\ (renamed so nobody double-clicks it); the dev tree keeps it in Play\.
     // Search up from the launcher's own folder, so launcher\publish\ works in the dev tree too.
+    // The engine exe loads engine_usa.dll or engine_pal.dll beside it by the extracted disc's id (engine_loader.cpp).
     public const string EngineExe = "nspb-engine.exe";
     static (string root, string dir, string exe) FindGame()
     {
@@ -151,6 +152,19 @@ sealed class MainForm : Form
                 if (File.Exists(Path.Combine(d.FullName, dir, exe))) return (d.FullName, Path.Combine(d.FullName, dir), Path.Combine(d.FullName, dir, exe));
         }
         return (start.FullName, Path.Combine(start.FullName, "engine"), Path.Combine(start.FullName, "engine", EngineExe));
+    }
+
+    // The extracted disc's id (R8PE01 USA, R8PP01 Europe), "" when none is set up.
+    string DiscGameId()
+    {
+        try
+        {
+            var header = new byte[8];
+            using var f = File.OpenRead(Path.Combine(DiscStatus().path, "sys", "boot.bin"));
+            f.ReadExactly(header, 0, 8);
+            return System.Text.Encoding.ASCII.GetString(header, 0, 6);
+        }
+        catch (Exception) { return ""; }
     }
 
     // The packaged defaults: borderless 1080p, cinematic 2.39:1, 120 fps interpolation, HD textures. Keys the
@@ -473,6 +487,9 @@ sealed class MainForm : Form
         playStatus.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
         body.Controls.Add(playStatus);
         AddDiscSetup(body);
+        // The Wii system language the game sees (runtime SCGetLanguage, Config.toml [game] language). The European
+        // disc ships English, French, German, Spanish and Italian text; the USA disc is English only.
+        body.Controls.Add(Choice("Language (European disc)", "language", new[] { ("English", "\"en\""), ("Français", "\"fr\""), ("Deutsch", "\"de\""), ("Español", "\"es\""), ("Italiano", "\"it\"") }, "game"));
         body.Controls.Add(gameNote = Note("The game starts borderless at 1080p. " +
                                "In the game, F10 opens the settings menu (resolution, aspect, controllers, audio) and F11 switches between fullscreen and a window."));
         // Tippi's tips: click the bubble (or Tippi in the sky) for another one.
@@ -491,7 +508,7 @@ sealed class MainForm : Form
         this.tipRow = tipRow;
         var row = new FlowLayoutPanel { AutoSize = true, Margin = Padding.Empty };
         row.Controls.Add(Btn("Open game folder", (_, _) => Process.Start("explorer.exe", play), Paper));
-        row.Controls.Add(Btn("Open saves folder", (_, _) => Process.Start("explorer.exe", Directory.CreateDirectory(WiiSave.DataDir(userData)).FullName), Paper));
+        row.Controls.Add(Btn("Open saves folder", (_, _) => Process.Start("explorer.exe", Directory.CreateDirectory(WiiSave.DataDir(userData, DiscGameId())).FullName), Paper));
         row.Controls.Add(Btn("Import Wii / Dolphin save...", (_, _) => ImportSave(), Paper));
         body.Controls.Add(row);
         return card;
@@ -510,7 +527,7 @@ sealed class MainForm : Form
             InitialDirectory = dolphin ?? "",
         };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        var dataDir = WiiSave.DataDir(userData);
+        var dataDir = WiiSave.DataDir(userData, DiscGameId());
         if (Directory.Exists(dataDir) && Directory.EnumerateFiles(dataDir).Any() &&
             MessageBox.Show(this, "This replaces your current save files. They are kept as a backup next to them (data.backup-<date>).\n\nImport the save?",
                 "Import save", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
@@ -588,16 +605,16 @@ sealed class MainForm : Form
         return card;
     }
 
-    Control Choice(string label, string key, (string label, string value)[] items)
+    Control Choice(string label, string key, (string label, string value)[] items, string section = "video")
     {
         var row = new FlowLayoutPanel { AutoSize = true, Margin = S(0, 4, 0, 4) };
         row.Controls.Add(new Label { Text = label, AutoSize = false, Size = S(200, 32), ForeColor = Ink, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
         var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(260), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10.5f), Margin = S(3, 4, 3, 4) };
         foreach (var item in items) combo.Items.Add(item.label);
-        string current = config.Get("video", key) ?? "";
+        string current = config.Get(section, key) ?? "";
         int index = Array.FindIndex(items, i => i.value.Trim('"') == current || (double.TryParse(i.value, out var a) && double.TryParse(current, out var b) && a == b));
         combo.SelectedIndex = index < 0 ? 0 : index;
-        combo.SelectedIndexChanged += (_, _) => { config.Set("video", key, items[combo.SelectedIndex].value); config.Save(); };
+        combo.SelectedIndexChanged += (_, _) => { config.Set(section, key, items[combo.SelectedIndex].value); config.Save(); };
         row.Controls.Add(combo);
         return row;
     }
@@ -886,14 +903,15 @@ sealed class MainForm : Form
         body.Controls.Add(progress);
         body.Controls.Add(progressText);
         body.Controls.Add(dumpHelp = Note(
-            "This port runs your own copy of Super Paper Mario (USA, R8PE01). It needs a disc image of the disc you own, " +
+            "This port runs your own copy of Super Paper Mario (USA R8PE01 or Europe R8PP01). It needs a disc image of the disc you own, " +
             "which the launcher decrypts and extracts once into its Disc folder (about 400 MB).\n\n" +
             "Making a legal image of your disc (Wii or Wii U consoles can read the disc; PC drives can't):\n" +
             "1. On a Wii with the Homebrew Channel, run CleanRip (or USB Loader GX's install option).\n" +
             "2. Insert Super Paper Mario and dump it to an SD card or USB drive. CleanRip writes a .iso " +
             "(it may be split into .part files: join them with  copy /b  on the PC); USB Loader GX writes a .wbfs.\n" +
             "3. Copy the file to this PC and choose it with the button above. .iso, .ciso and .wbfs all work.\n" +
-            "Only the USA release, revision 0, works. A Dolphin-extracted folder also works: put it in Disc\\DATA next to the launcher."));
+            "The USA release (revision 0) and the European release work; the European disc also offers French, German, Spanish and Italian. " +
+            "A Dolphin-extracted folder also works: put it in Disc\\DATA next to the launcher."));
     }
 
     (bool ok, string text, string path) DiscStatus()
@@ -905,9 +923,9 @@ sealed class MainForm : Form
         var header = new byte[8];
         using (var f = File.OpenRead(Path.Combine(path, "sys", "boot.bin"))) f.ReadExactly(header, 0, 8);
         string id = System.Text.Encoding.ASCII.GetString(header, 0, 6);
-        if (id != "R8PE01" || header[7] != 0)
-            return (false, $"The disc folder holds {id} revision {header[7]}, not Super Paper Mario USA revision 0: {path}", path);
-        return (true, "Super Paper Mario (R8PE01) is ready: " + path, path);
+        if (!(id == "R8PE01" && header[7] == 0) && id != "R8PP01")
+            return (false, $"The disc folder holds {id} revision {header[7]}, not Super Paper Mario USA revision 0 or Europe: {path}", path);
+        return (true, $"Super Paper Mario ({id}, {(id == "R8PP01" ? "Europe" : "USA")}) is ready: " + path, path);
     }
 
     void RefreshStatus()

@@ -27,7 +27,7 @@ with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the ga
 ## How to play
 
 You need **Windows 10/11 (64-bit)**, a graphics card with DirectX 12 or Vulkan, and your own dump of
-**Super Paper Mario, USA Wii disc (R8PE01, revision 0)** as `.iso`, `.ciso` or `.wbfs`.
+**Super Paper Mario, USA Wii disc (R8PE01, revision 0) or European disc (R8PP01: English, French, German, Spanish, Italian)** as `.iso`, `.ciso` or `.wbfs`.
 
 1. Download `NewSuperPaperBros.zip` from [Releases](../../releases) and unzip it.
 2. Open `New Super Paper Bros.exe`. Windows may show "Windows protected your PC" because the exe isn't signed:

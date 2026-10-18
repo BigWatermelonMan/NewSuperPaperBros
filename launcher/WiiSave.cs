@@ -8,12 +8,16 @@ namespace NewSuperPaperBros;
 // decrypted here the way Dolphin's WiiSave.cpp does it.
 static class WiiSave
 {
-    public const ulong TitleId = 0x0001000052385045;  // R8PE
+    public const ulong TitleId = 0x0001000052385045;  // R8PE (the USA disc; the European disc is R8PP = ...52385050)
     static readonly byte[] SdKey = Convert.FromHexString("AB01B9D8E1622B08AFBAD84DBFC2A55D");
     static readonly byte[] SdIv = Convert.FromHexString("216712E6AA1F689F95C5A22324DC6A98");
     const int HeaderSize = 0xF0C0, BkHeaderSize = 0x80, FileHeaderSize = 0x80;
 
-    public static string DataDir(string userData) => Path.Combine(userData, "NAND", "title", "00010000", "52385045", "data");
+    // The game's title id from its disc id ("R8PE01" -> 0001000052385045): saves live under it, per region.
+    public static ulong TitleIdOf(string gameId) => 0x0001000000000000UL | BinaryPrimitives.ReadUInt32BigEndian(System.Text.Encoding.ASCII.GetBytes(gameId.PadRight(4)[..4]));
+
+    public static string DataDir(string userData, string gameId = "R8PE01") =>
+        Path.Combine(userData, "NAND", "title", "00010000", (TitleIdOf(gameId) & 0xFFFFFFFF).ToString("x8"), "data");
 
     // Copies the save into dataDir; an existing save there is moved to data.backup-<time> first. Returns the files written.
     public static List<string> Import(string source, string dataDir)
@@ -47,8 +51,8 @@ static class WiiSave
         if (bin.Length < HeaderSize + BkHeaderSize) throw new InvalidDataException("This data.bin is too small to be a Wii save.");
         var header = Decrypt(bin.AsSpan(0, HeaderSize), SdIv);
         ulong tid = BinaryPrimitives.ReadUInt64BigEndian(header);
-        if (tid != TitleId)
-            throw new InvalidDataException($"This data.bin is not a Super Paper Mario (USA) save (title {tid:X16}).");
+        if (tid != TitleId && tid != TitleIdOf("R8PP01"))
+            throw new InvalidDataException($"This data.bin is not a Super Paper Mario (USA or Europe) save (title {tid:X16}).");
         int bannerSize = (int)BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
 
         var bk = bin.AsSpan(HeaderSize, BkHeaderSize);

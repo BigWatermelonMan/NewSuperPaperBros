@@ -59,6 +59,14 @@ extern "C" uint32_t SCGetAspectRatio_HLE()
 
 PPC_NATIVE_OVERRIDE(8029B8D8, SCGetAspectRatio_HLE, uint32_t, (), ());
 
+// 0x8029B9AC -> SCGetLanguage(): the console's language setting, from Config.toml [game] language (runtime_config.h).
+extern "C" uint32_t SCGetLanguage_HLE()
+{
+    return RuntimeConfigFile::Language();
+}
+
+PPC_NATIVE_OVERRIDE(8029B9AC, SCGetLanguage_HLE, uint32_t, (), ());
+
 // 0x801DD2B0 -> SCGetEuRgb60Mode()
 // Returns: 0 = PAL50, 1 = PAL60/RGB60
 extern "C" uint32_t SCGetEuRgb60Mode_HLE()

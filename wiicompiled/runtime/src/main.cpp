@@ -1679,6 +1679,11 @@ int RuntimeMain(int argc, char** argv) {
 extern "C" __attribute__((visibility("default"))) int SDL_main(int argc, char** argv) {
     return RuntimeMain(argc, argv);
 }
+#elif defined(MKW_ENGINE_MODULE)
+// Windows region module (engine_usa.dll / engine_pal.dll): src/product/engine_loader.cpp loads it and calls this.
+extern "C" __declspec(dllexport) int SDL_main(int argc, char** argv) {
+    return RuntimeMain(argc, argv);
+}
 #else
 int main(int argc, char** argv) {
     return RuntimeMain(argc, argv);

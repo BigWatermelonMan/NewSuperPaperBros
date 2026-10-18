@@ -63,10 +63,10 @@ sealed class WiiDisc : IDisposable
     // "" when this is the disc the game runs, else why not.
     public string Problem()
     {
-        if (GameId != "R8PE01")
-            return $"That is {GameId} ({Title}), not Super Paper Mario for the USA (R8PE01). Only the USA disc works.";
-        if (Revision != 0)
-            return $"That is Super Paper Mario revision {Revision}; only revision 0 (the first print) works.";
+        if (GameId is not ("R8PE01" or "R8PP01"))
+            return $"That is {GameId} ({Title}), not Super Paper Mario for the USA (R8PE01) or Europe (R8PP01). Only those two discs work.";
+        if (GameId == "R8PE01" && Revision != 0)
+            return $"That is Super Paper Mario USA revision {Revision}; only revision 0 (the first print) works.";
         return "";
     }
 

@@ -35,6 +35,7 @@ struct RuntimeUserConfig {
     std::optional<bool> widescreen;
     std::optional<bool> forceAspect169;
     std::optional<int32_t> aspectMode;  // 0 original 4:3, 1 16:9, 2 fill the window (DisplaySettings)
+    std::optional<std::string> language;  // [game] language: en fr de es it (the Wii system language SCGetLanguage reports)
     std::optional<int32_t> gpuCompat;  // 0 auto (by graphics adapter), 1 on, 2 off (AuroraGpuCompat)
     std::optional<int32_t> windowPosX;
     std::optional<int32_t> windowPosY;
@@ -541,6 +542,7 @@ inline RuntimeUserConfig ParseConfigDocument(const toml::value& document) {
         }
     }
 
+    config.language = FindConfigValue<std::string>(document, "game", "language");
     config.widescreen = FindConfigValue<bool>(document, "video", "widescreen");
     config.forceAspect169 = FindConfigValue<bool>(document, "video", "force_16_9");
     if (auto value = FindConfigInt(document, "video", "aspect_mode"); value && *value >= 0 && *value <= 3) {
@@ -969,6 +971,17 @@ inline bool WidescreenEnabled(bool fallback = false) {
 
 inline bool ForceAspect169Enabled(bool fallback = false) {
     return Get().forceAspect169.value_or(fallback);
+}
+
+// SC language code the game sees (SCGetLanguage): 0 jp, 1 en, 2 de, 3 fr, 4 es, 5 it, 6 nl. The PAL disc picks its
+// msg/ folder from it; the USA disc only has English.
+inline uint32_t Language() {
+    static constexpr const char* kCodes[] = {"jp", "en", "de", "fr", "es", "it", "nl"};
+    const std::string value = Get().language.value_or("en");
+    for (uint32_t i = 0; i < 7; ++i) {
+        if (value == kCodes[i]) return i;
+    }
+    return 1;
 }
 
 // Display aspect (DisplaySettings): 0 original 4:3, 1 16:9, 2 fill the window or screen, 3 cinematic 2.39:1.

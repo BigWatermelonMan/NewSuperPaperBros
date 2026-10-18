@@ -2,7 +2,8 @@ NEW SUPER PAPER BROS. {VERSION}
 ==============================
 Start: open "New Super Paper Bros.exe" and press PLAY.
 
-First time only: on the Play page, choose your Super Paper Mario disc image (.iso / .ciso / .wbfs, USA R8PE01).
+First time only: on the Play page, choose your Super Paper Mario disc image (.iso / .ciso / .wbfs, USA R8PE01 or
+Europe R8PP01; the European disc also plays in French, German, Spanish and Italian: pick the language on the Play page).
 The launcher extracts it into the Disc folder here.
 
 Settings: the launcher's Display page (resolution, aspect, frame interpolation) and Controls page (gamepad and

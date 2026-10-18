@@ -173,7 +173,7 @@ def write_report(out, maps, results, original_unchanged, reason=''):
     (out / 'REPORT.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
-def prepare(root, out, exe):
+def prepare(root, out, exe, disc):
     play = out / 'Play'
     play.mkdir(parents=True, exist_ok=False)
     original = root / 'Play'
@@ -206,13 +206,17 @@ def prepare(root, out, exe):
             config = config.replace('[video]\n', f'[video]\n{key} = {value}\n', 1)
     if os.environ.get('SPM_SWEEP_WIDESCREEN'):  # diagnostic: true/false
         config = re.sub(r'(?m)^widescreen\s*=.*$', f"widescreen = {os.environ['SPM_SWEEP_WIDESCREEN']}", config)
+    config = re.sub(r"(?m)^dvd_root\s*=.*$", lambda _: f"dvd_root = '{disc}'", config)  # --disc (the PAL dump in Disc_PAL)
+    if os.environ.get('SPM_SWEEP_LANGUAGE'):  # PAL engine: en fr de es it ([game] language, SCGetLanguage)
+        config = re.sub(r'(?ms)\n\[game\].*?(?=\n\[|\Z)', '', config) + f"\n[game]\nlanguage = \"{os.environ['SPM_SWEEP_LANGUAGE']}\"\n"
     (data / 'Config.toml').write_text(config, encoding='utf-8')
     return play
 
 
 def run(args):
     root = args.root.resolve()
-    names = sorted(p.stem for p in (root / 'Disc/DATA/files/map').glob('*.bin'))
+    disc = (args.disc or root / 'Disc/DATA').resolve()
+    names = sorted(p.stem for p in (disc / 'files/map').glob('*.bin'))
     maps = args.maps.split(',') if args.maps else names
     if not maps or len(set(maps)) != len(maps) or any(m not in names for m in maps):
         raise ValueError('Maps must be unique names from Disc/DATA/files/map')
@@ -223,7 +227,7 @@ def run(args):
     out.mkdir(parents=True, exist_ok=False)
     saves = root / 'Play/UserData/Saves'
     before = fingerprint(saves)
-    play = prepare(root, out, args.exe or root / 'Play/SuperPaperMario.exe')
+    play = prepare(root, out, args.exe or root / 'Play/SuperPaperMario.exe', disc)
     results, index, boot_failures, launches = [], 0, 0, 0
     reason = ''
     print(f'Sweep: {len(maps)} maps; output: {out}', flush=True)
@@ -318,7 +322,8 @@ def run(args):
                             tail = tail[split+1:]
                     exited = process.poll() is not None
                     timed_out = time.monotonic()-progress > (max(45, args.seconds + 40) if current else 100)
-                    if exited or timed_out:
+                    finished = current is None and index >= len(maps)  # every map sampled: close the game at once
+                    if exited or timed_out or finished:
                         if not exited:
                             process.kill()
                             process.wait(timeout=10)
@@ -355,6 +360,7 @@ if __name__ == '__main__':
     ap.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     ap.add_argument('--out', type=Path)
     ap.add_argument('--exe', type=Path)
+    ap.add_argument('--disc', type=Path, help='Extracted disc (DATA folder); default Disc/DATA. PAL: --disc Disc_PAL/DATA --exe Play/SuperPaperMarioPAL.exe')
     ap.add_argument('--maps', help='Comma-separated map names; default is every map file')
     ap.add_argument('--limit', type=int)
     ap.add_argument('--seconds', type=int, default=3, choices=range(1, 61))

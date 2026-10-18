@@ -357,6 +357,8 @@ endif()
 set(MKW_PLATFORM_SOURCE "${CMAKE_CURRENT_LIST_DIR}/src/platform/host_platform.cpp")
 set(MKW_BASE_PRODUCT_SOURCE "${CMAKE_CURRENT_LIST_DIR}/src/product/base_product.cpp")
 set(MKW_RETRO_REWIND_PRODUCT_SOURCE "${CMAKE_CURRENT_LIST_DIR}/src/product/retro_rewind_product.cpp")
+# The region-module loader is its own executable (cmake/PublicProducts.cmake, MKW_ENGINE_MODULE), not runtime code.
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_LIST_DIR}/src/product/engine_loader.cpp")
 # The host ISA guard is the one translation unit that must not receive the
 # x86-64-v3 flags, so it gets its own object library instead of riding along in
 # mkw_runtime_common. See cmake/PublicProducts.cmake and the file's own header.
