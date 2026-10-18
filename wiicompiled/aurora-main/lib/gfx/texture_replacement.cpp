@@ -72,8 +72,10 @@ struct ReplacementIndexEntry {
 
 absl::flat_hash_map<RuntimeTextureKey, ReplacementIndexEntry> s_replacementIndex;
 // <UserData>/button_icons/<style>: per-controller button prompts, looked up before everything else.
-constexpr const char* kButtonIconStyles[] = {"xbox", "playstation", "nintendo"};
-std::array<absl::flat_hash_map<RuntimeTextureKey, ReplacementIndexEntry>, 3> s_buttonIconIndex;
+// The last, "common", applies whatever the style (also with none): looked up after the style's own set.
+constexpr const char* kButtonIconStyles[] = {"xbox", "playstation", "nintendo", "common"};
+constexpr int kCommonIcons = 3;
+std::array<absl::flat_hash_map<RuntimeTextureKey, ReplacementIndexEntry>, 4> s_buttonIconIndex;
 std::atomic<int> s_buttonIconStyle{-1};
 std::atomic<bool> s_buttonIconStyleChanged{false};
 int s_appliedButtonIconStyle = -1;
@@ -597,7 +599,7 @@ void build_index() noexcept {
   }
   // SPM_BUTTON_ICONS=xbox|playstation|nintendo pins a set (tests; scripted input never reaches the gamepad code).
   if (const char* forced = std::getenv("SPM_BUTTON_ICONS")) {
-    for (size_t style = 0; style < s_buttonIconIndex.size(); ++style)
+    for (size_t style = 0; style < kCommonIcons; ++style)
       if (std::string_view(forced) == kButtonIconStyles[style]) s_buttonIconForced = static_cast<int>(style);
     set_button_icon_style(s_buttonIconForced);
   }
@@ -608,6 +610,7 @@ const ReplacementIndexEntry* find_replacement_path(const RuntimeTextureKey& key)
     const auto& icons = s_buttonIconIndex[s_appliedButtonIconStyle];
     if (const auto it = icons.find(key); it != icons.end()) return &it->second;
   }
+  if (const auto it = s_buttonIconIndex[kCommonIcons].find(key); it != s_buttonIconIndex[kCommonIcons].end()) return &it->second;
   if (const auto it = s_replacementIndex.find(key); it != s_replacementIndex.end()) {
     return &it->second;
   }
@@ -844,7 +847,7 @@ std::optional<TextureHandle> find_replacement(const GXTexObj_& obj) noexcept {
 
 void set_button_icon_style(int style) noexcept {
   if (s_buttonIconForced >= 0) style = s_buttonIconForced;
-  if (style < -1 || style >= static_cast<int>(s_buttonIconIndex.size())) style = -1;
+  if (style < -1 || style >= kCommonIcons) style = -1;
   if (s_buttonIconStyle.exchange(style) != style) s_buttonIconStyleChanged.store(true);
 }
 

@@ -418,6 +418,15 @@ void Tick(CpuContext* cpu, uint32_t presentedFrames) {
         CpuContext call = *cpu;
         InvokeIndirectCpu(0x801214EC, &call);  // marioGetPtr
         const uint32_t mw = call.gpr[3];
+        if (Memory::Contains(mw, 0x320)) {
+            // The map object Mario stands on (hitGetName of MarioWork+0x1C4), e.g. he3_08's statue pedestal "A2D_dai".
+            CpuContext hit = *cpu;
+            hit.gpr[3] = Memory::Read32(mw + 0x1C4);
+            InvokeIndirectCpu(0x80070780, &hit);  // hitGetName
+            char ground[24] = {};
+            for (int i = 0; i < 23 && Memory::Contains(hit.gpr[3] + i, 1) && (ground[i] = char(Memory::Read8(hit.gpr[3] + i))); ++i) {}
+            RT_LOGF(RT_TAG_RUNTIME, "[mario] ground %s\n", ground);
+        }
         if (Memory::Contains(mw, 0x320))
             RT_LOGF(RT_TAG_RUNTIME, "[mario] f=%u pos %.2f %.2f %.2f xz %.3f walk %.2f mot %u sub %d held %04X rep %04X joy %u,%u ctrl %u keyoff %u flags %08X dir %.1f wpad %08X\n",
                     presentedFrames, Memory::ReadFloat32(mw + 0x5C), Memory::ReadFloat32(mw + 0x60), Memory::ReadFloat32(mw + 0x64),
@@ -425,6 +434,21 @@ void Tick(CpuContext* cpu, uint32_t presentedFrames) {
                     Memory::Read16(mw + 0x30C), Memory::Read16(mw + 0x310), Memory::Read8(mw + 0x316), Memory::Read8(mw + 0x317),
                     Memory::Read8(mw + 0x34), Memory::Read8(mw + 0x35), Memory::Read32(mw), Memory::ReadFloat32(mw + 0x174),
                     Memory::Contains(Memory::Read32(0x8056D1B8u), 4) ? Memory::Read32(Memory::Read32(0x8056D1B8u)) : 0u);
+    }
+    // SPM_MARIO_POS=x,y,z: once Mario has been in a map for a second, put him there (tests at a spot; one time).
+    static const char* posEnv = std::getenv("SPM_MARIO_POS");
+    static uint32_t inMapFrames = 0;
+    if (posEnv && cpu && Memory::TryRead32(kNowSeq, seq) && seq == 2 && ++inMapFrames == 60) {
+        float p[3] = {};
+        if (std::sscanf(posEnv, "%f,%f,%f", &p[0], &p[1], &p[2]) == 3) {
+            CpuContext call = *cpu;
+            InvokeIndirectCpu(0x801214EC, &call);  // marioGetPtr
+            const uint32_t mw = call.gpr[3];
+            if (Memory::Contains(mw, 0x70)) {
+                for (int i = 0; i < 3; ++i) Memory::WriteFloat32(mw + 0x5C + 4 * i, p[i]);
+                RT_LOGF(RT_TAG_RUNTIME, "[mario] placed at %.1f %.1f %.1f\n", p[0], p[1], p[2]);
+            }
+        }
     }
     static Sweep sweep;
     sweep.Tick(cpu, presentedFrames);

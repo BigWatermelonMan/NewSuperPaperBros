@@ -79,12 +79,9 @@ BUTTON_SPOTS = {
 
 # The Controls screen's 3D Wii Remote (its textures), hidden in every controller set; <style>/remote/ also tells the
 # game to draw controller.png in its place (settings_overlay.cpp).
-REMOTE_TEXTURES = [(256, 64, "ddc0097f76e8016b", 14), (256, 64, "a2fd9566973811d6", 14),
-                   (64, 32, "3b9919c664469aa9", 14), (80, 44, "c113b191224defc0", 14),
-                   (64, 64, "9e627a1a399a4c12", 14), (40, 40, "cbfb60592791075d", 14),   # its D-pad, + button,
-                   (40, 40, "f5cacaa9307af129", 14), (40, 40, "ba5a00dad5242ff6", 14),   # power and HOME buttons,
-                   (48, 48, "35ee47364ed32d4b", 14), (48, 48, "5ec38efb2637eebc", 14),   # and its wrist strap
-                   (48, 48, "6d247fec912ea54b", 14)]
+REMOTE_TEXTURES = [(256, 64, "ddc0097f76e8016b", 14), (256, 64, "a2fd9566973811d6", 14),   # only the remote's body:
+                   (64, 32, "3b9919c664469aa9", 14), (80, 44, "c113b191224defc0", 14)]   # its button icons are used
+                                                                                         # elsewhere too (issue #7)
 
 _render_cache = {}
 
@@ -164,9 +161,22 @@ def tippi(img, style):
     img.alpha_composite(solid((255, 255, 255, 255), holes(stick)), at)       # its R and ring in white
 
 
-def controller_picture(style):
+def sideways_picture(picture):
+    """The boot screen "Hold the Wii Remote sideways." (its line reads "Enjoy New Super Paper Bros!", dvd.cpp): its
+    hands-and-remote texture (464x288) becomes the controller in use, at the 4x size of the HD pack."""
+    canvas = Image.new("RGBA", (464 * 4, 288 * 4), (0, 0, 0, 0))
+    pic = picture.copy()
+    pic.thumbnail((int(canvas.width * 0.8), int(canvas.height * 0.85)), Image.LANCZOS)
+    canvas.alpha_composite(pic, ((canvas.width - pic.width) // 2, (canvas.height - pic.height) // 2))
+    return canvas
+
+
+SIDEWAYS_TEXTURE = "tex1_464x288_36a6f13147d63352_14.png"
+
+
+def controller_picture(style, name=None):
     """Kenney's flat controller: white body, dark buttons, black outline, like the game's paper cut-outs."""
-    pic = render_svg(style, STYLES[style]["controller"], 1100)
+    pic = render_svg(style, name or STYLES[style]["controller"], 1100)
     a = pic.getchannel("A").point(lambda v: 255 if v > 128 else 0)
     detail = holes(pic)
     pad = 24
@@ -242,6 +252,7 @@ def main():
         for w, h, hsh, fmt in REMOTE_TEXTURES:
             Image.new("RGBA", (w, h), (0, 0, 0, 0)).save(os.path.join(out, "marker1", f"tex1_{w}x{h}_{hsh}_{fmt}.png"))
         controller_picture(style).save(os.path.join(out, "controller.png"))
+        sideways_picture(Image.open(os.path.join(out, "controller.png"))).save(os.path.join(out, SIDEWAYS_TEXTURE))
         with open(os.path.join(out, "panel.txt"), "w", encoding="ascii") as f:
             # <action> <x> <y>: where the action's button is, in fractions of controller.png
             for name, (fx, fy) in BUTTON_SPOTS[style].items():
@@ -257,6 +268,13 @@ def main():
         for action, button in icons.items():
             render_svg(style, STYLES[style][button], 128).save(os.path.join(out, "ui", action + ".png"))
         print(f"{style}: {n} textures -> {out}")
+    # For players without a controller (button_icons/common, looked up after a style's own set): the boot screen
+    # shows a keyboard instead of the hands holding a Wii Remote.
+    common = os.path.join(args.out, "common")
+    shutil.rmtree(common, ignore_errors=True)
+    os.makedirs(common)
+    sideways_picture(controller_picture("common", "keyboard")).save(os.path.join(common, SIDEWAYS_TEXTURE))
+    print(f"common: -> {common}")
 
 
 if __name__ == "__main__":

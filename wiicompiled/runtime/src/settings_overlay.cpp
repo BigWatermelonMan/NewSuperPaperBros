@@ -13,12 +13,14 @@ extern "C" uint8_t* aurora_load_png_rgba(const char* path, uint32_t* width, uint
 #include "controller_button_names.h"
 #include "controller_mapping_wizard.h"
 #include "input_bindings.h"
+#include "keybinds.h"
 #include "game_graphics_options.h"
 #include "music_attenuation.h"
 #include "runtime_config.h"
 #include "display_settings.h"
 #include <dolphin/gx/GXAurora.h>
 #include "runtime_log.h"
+#include "memory.h"
 #include "wii_remote_input.h"
 
 #include <imgui.h>
@@ -1398,7 +1400,8 @@ void DrawStartupScreen() {
                 if (it != sprites.end()) return it->second;
                 Sprite sp;
                 uint32_t w = 0, h = 0;
-                if (uint8_t* rgba = aurora_load_png_rgba((std::string("startup/") + name + ".png").c_str(), &w, &h)) {
+                const std::string file = name[0] == '@' ? std::string(name + 1) : std::string("startup/") + name + ".png";  // '@' = a path
+                if (uint8_t* rgba = aurora_load_png_rgba(file.c_str(), &w, &h)) {
                     sp.id = aurora_imgui_add_texture(w, h, rgba);
                     sp.w = float(w);
                     sp.h = float(h);
@@ -1513,17 +1516,36 @@ void DrawStartupScreen() {
                 GameLayout::DrawText(list, view, *pmFont, u, 0.0f, by - 26.0f + bob, Fit(u, 15.0f), 0x3A2A18FFu, 0x3A2A18FFu,
                                      1.0f, 1, 1);
             } else {
-                const float pop = 1.0f + 0.06f * std::sin(t * 5.0f);
-                const auto u = GameLayout::Utf16("Press A or 2 to start!");
-                const float fs = Fit(u, 26.0f) * pop;
-                const float w = GameLayout::MeasureText(*pmFont, u, fs);
-                Draw("button2", -w * 0.5f - 22.0f, cardY - 80.0f + bob, 34.0f * pop, 0.0f, false);
-                for (int j = 0; j < 12; ++j) {
-                    const float a = j * 0.5236f;
-                    GameLayout::DrawText(list, view, *pmFont, u, 14.0f + std::cos(a) * 2.5f, cardY - 80.0f + bob + std::sin(a) * 2.5f, fs,
-                                         0xFFFFFFFFu, 0xFFFFFFFFu, 1.0f, 1, 1);
+                const float pop = 1.0f + 0.06f * std::sin(t * 5.0f), py = cardY - 80.0f + bob;
+                // The start button of what the player is holding: the controller's own jump button (its icon), else
+                // the keyboard's jump key. Both are 2 on the Wii Remote, which the cover waits for (frame_input.cpp).
+                const int padStyle = aurora_button_icon_style();
+                static const char* const kStyleDirs[3] = {"xbox", "playstation", "nintendo"};
+                const std::string icon = padStyle >= 0 && padStyle < 3
+                    ? "@" + RuntimeConfigFile::PathToUtf8(RuntimeConfigFile::ApplicationDataDirectory() / "button_icons" /
+                                                          kStyleDirs[padStyle] / "ui" / "jump.png")
+                    : std::string();
+                const auto press = GameLayout::Utf16(icon.empty() ? "Press " + Keybinds::KeyLabel(Keybinds::kJump) + " to start!" : "Press");
+                const auto rest = GameLayout::Utf16("to start!");
+                const float fs = Fit(icon.empty() ? press : GameLayout::Utf16("Press A or 2 to start!"), 26.0f) * pop;
+                const float iconSize = 34.0f * pop, gap = 8.0f;
+                const float wPress = GameLayout::MeasureText(*pmFont, press, fs);
+                const float wRest = icon.empty() ? 0.0f : GameLayout::MeasureText(*pmFont, rest, fs);
+                float x = -(wPress + (icon.empty() ? 0.0f : gap + iconSize + gap + wRest)) * 0.5f;
+                const auto outlined = [&](const std::u16string& u, float at) {  // white outline, blue fill, like the title
+                    for (int j = 0; j < 12; ++j) {
+                        const float a = j * 0.5236f;
+                        GameLayout::DrawText(list, view, *pmFont, u, at + std::cos(a) * 2.5f, py + std::sin(a) * 2.5f, fs,
+                                             0xFFFFFFFFu, 0xFFFFFFFFu, 1.0f, 0, 1);
+                    }
+                    GameLayout::DrawText(list, view, *pmFont, u, at, py, fs, 0x3D8BFFFFu, 0x1A3FA0FFu, 1.0f, 0, 1);
+                };
+                outlined(press, x);
+                if (!icon.empty()) {
+                    x += wPress + gap;
+                    Draw(icon.c_str(), x + iconSize * 0.5f, py, iconSize, 0.0f, false);
+                    outlined(rest, x + iconSize + gap);
                 }
-                GameLayout::DrawText(list, view, *pmFont, u, 14.0f, cardY - 80.0f + bob, fs, 0x3D8BFFFFu, 0x1A3FA0FFu, 1.0f, 1, 1);
             }
             // The heroes flank the card; Peach waves from the hills.
             Shadow(-345.0f, -118.0f, 62.0f);
@@ -1957,7 +1979,10 @@ void DrawControlsPanel() {
     const int style = aurora_button_icon_style();
     static double shownSince = -1.0;
     static bool seen[8] = {};  // actions shown since the screen opened (bubbles slide in one after another)
-    if (style < 0 || style > 2 || !aurora_button_icon_marker(1)) {
+    // The screen is up while the remote's body (marker 1) and its Move bubble (marker 2, on every version of it) are
+    // drawn: either alone also appears elsewhere, and a panel opened there could not be closed (issue #7).
+    const bool screenUp = aurora_button_icon_marker(1) && (seen[2] || aurora_button_icon_marker(2));
+    if (style < 0 || style > 2 || !screenUp) {
         if (shownSince >= 0.0)  // closed: what it showed (diagnoses a missing callout)
             std::fprintf(stderr, "[controls panel] style %d showed move %d flip %d jump %d pixl %d tippi %d\n", style, seen[2],
                          seen[3], seen[4], seen[5], seen[6]);
@@ -2100,7 +2125,44 @@ void DrawControlsPanel() {
     text("Quick menu", x + gap, fy, 15.0f, 0xFFFFFFFFu, 0);
 }
 
+// New Super Paper Bros.: the boot screen "Hold the Wii Remote sideways." takes its line from a table in main.dol (one
+// per language: the USA build has English, French and Japanese, the PAL build all five plus Japanese). Each one reads
+// "Enjoy New Super Paper Bros!" instead, rewritten in guest memory once, by content, so it works for both regions;
+// the controller in use is drawn on that screen by the button_icons texture sets.
+void PatchBootStrings() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    static const char* const kLines[] = {
+        "Hold the Wii Remote sideways.",
+        "Hold the t\xe9l\xe9" "commande Wii sideways.",
+        "Halte die Wii-Fernbedienung waagrecht.",
+        "Tenez la t\xe9l\xe9" "commande Wii \xe0 l'horizontale.",
+        "Sujeta el mando de Wii en posici\xf3n horizontal.",
+        "Afferra il telecomando Wii alle estremit\xe0.",
+        "\x82\x76\x82\x89\x82\x89\x83\x8a\x83\x82\x83\x52\x83\x93\x82\xf0\x81\x77\x82\xe6\x82\xb1\x82\xe0\x82\xbf\x81\x78"
+        "\x82\xb5\x82\xc4\x82\xad\x82\xbe\x82\xb3\x82\xa2\x81\x42",  // Japanese, Shift-JIS
+    };
+    static constexpr std::string_view kText = "Enjoy New Super Paper Bros!";
+    constexpr uint32_t kStart = 0x80004000u, kSize = 0x00600000u;  // main.dol's sections
+    uint8_t* const mem = Memory::Contains(kStart, kSize) ? Memory::GetPointer(kStart, kSize) : nullptr;
+    if (mem == nullptr) return;
+    int patched = 0;
+    for (const char* text : kLines) {
+        const auto* line = reinterpret_cast<const uint8_t*>(text);  // bytes, not signed chars: the accented lines
+        const size_t len = std::strlen(text) + 1;  // with its NUL: whole strings only
+        for (uint8_t* p = mem; (p = std::search(p, mem + kSize, line, line + len)) != mem + kSize; p += len) {
+            if (len - 1 < kText.size()) break;
+            std::fill(p, p + len, uint8_t{0});
+            std::copy(kText.begin(), kText.end(), p);
+            ++patched;
+        }
+    }
+    RT_LOGF(RT_TAG_RUNTIME, "boot screen: %d line(s) now read \"Enjoy New Super Paper Bros!\"\n", patched);
+}
+
 void Draw() noexcept {
+    PatchBootStrings();
     // Wait for the frame worker's DONE phase: it has replayed the previous frame's ImGui draw lists
     // and started the next ImGui frame, so all overlay callers can now safely issue ImGui commands.
     aurora_wait_for_frame_worker();
