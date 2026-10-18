@@ -190,14 +190,14 @@ def prepare(root, out, exe):
         shutil.copytree(original / 'game_files', play / 'game_files')
     data = play / 'UserData'
     data.mkdir()
-    for name in ('Saves', 'NAND', 'mods'):
+    for name in ('Saves', 'NAND', 'mods', 'button_icons') + (('texture_replacements',) if os.environ.get('SPM_SWEEP_HDPACK') else ()):
         if (original / 'UserData' / name).exists():
             shutil.copytree(original / 'UserData' / name, data / name)
     config = (original / 'UserData/Config.toml').read_text(encoding='utf-8')
     # aspect_mode 2 (fill) and no interpolation: letterbox bars would count as black, inserted frames as draws.
     # SPM_SWEEP_WINDOW=1920x1080 and SPM_SWEEP_RES=2.25: bigger window / render scale for promo screenshots.
     win_w, win_h = (os.environ.get('SPM_SWEEP_WINDOW') or '1280x720').lower().split('x')
-    for key, value in dict(window_width=win_w, window_height=win_h, texture_replacements=os.environ.get('SPM_SWEEP_TEXREPL', 'false'), texture_dumps='false',
+    for key, value in dict(window_width=win_w, window_height=win_h, texture_replacements=os.environ.get('SPM_SWEEP_TEXREPL', 'false'), texture_dumps=os.environ.get('SPM_SWEEP_TEXDUMP', 'false'),
                            display_mode='"windowed"', resolution_multiplier=os.environ.get('SPM_SWEEP_RES', '1.0'),
                            aspect_mode=os.environ.get('SPM_SWEEP_ASPECT', '2'),
                            frame_interpolation_fps=os.environ.get('SPM_SWEEP_INTERP', '0')).items():

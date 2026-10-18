@@ -3,6 +3,8 @@
 #ifdef AURORA_ENABLE_GX
 #include "gfx/common.hpp"
 #include "gfx/efb_ram_copy.hpp"
+#include "gfx/texture_replacement.hpp"
+#include "gx/gx.hpp"
 #include "gx/fifo.hpp"
 #include "gx/shader_info.hpp"
 #include "imgui.hpp"
@@ -2086,6 +2088,27 @@ uint32_t aurora_get_frame_interpolation_fps() {
 void aurora_request_frame_capture(uint32_t frame, const char* outputPath) {
   aurora::g_captureOutputPath = outputPath != nullptr ? outputPath : "frame_capture.bmp";
   aurora::g_captureFrame.store(frame, std::memory_order_release);
+}
+void aurora_set_button_icon_style(int style) {
+#ifdef AURORA_ENABLE_GX
+  aurora::gfx::texture_replacement::set_button_icon_style(style);
+#endif
+}
+int aurora_button_icon_style() {
+#ifdef AURORA_ENABLE_GX
+  return aurora::gfx::texture_replacement::button_icon_style();
+#else
+  return -1;
+#endif
+}
+bool aurora_button_icon_marker(int id) {
+#ifdef AURORA_ENABLE_GX
+  if (id <= 0 || id >= 8) return false;
+  const uint32_t seen = aurora::gx::g_spmMarkerFrames[id].load(std::memory_order_relaxed);
+  return seen != 0 && aurora::gfx::current_frame() + 1 - seen <= 3;
+#else
+  return false;
+#endif
 }
 bool aurora_flush_efb_copies_to_ram() {
 #ifdef AURORA_ENABLE_GX

@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <dolphin/gx.h>
 #include <aurora/math.hpp>
 
@@ -474,6 +475,7 @@ void clear_copy_texture_cache() noexcept;
 void clear_display_copy_cache() noexcept;
 void set_display_copy_present_source() noexcept;
 void evict_copy_texture(const void* dest) noexcept;
+extern std::atomic<u32> g_spmMarkerFrames[8];
 // NSMBW: the cached static textures whose RAM holds `dest` (a copy patching part of a texture).
 struct PatchTarget {
   gfx::TextureHandle texture;

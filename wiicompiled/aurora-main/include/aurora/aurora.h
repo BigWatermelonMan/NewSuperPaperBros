@@ -176,6 +176,12 @@ void aurora_report_producer_paced(bool paced);
 void aurora_request_frame_capture(uint32_t frame, const char* outputPath);
 bool aurora_flush_efb_copies_to_ram();
 bool aurora_flush_efb_copy_to_ram(void* dest);
+// Button prompt textures for the controller in use: 0 xbox, 1 playstation, 2 nintendo, -1 the game's own.
+void aurora_set_button_icon_style(int style);
+// The icon set in use (-1 = the game's own), and whether a texture from button_icons/<style>/marker<id> was drawn
+// in the last couple of frames.
+int aurora_button_icon_style();
+bool aurora_button_icon_marker(int id);
 
 void aurora_set_log_level(AuroraLogLevel level);
 void aurora_set_pause_on_focus_lost(bool value);

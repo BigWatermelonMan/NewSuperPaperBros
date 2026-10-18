@@ -48,6 +48,8 @@ Get-ChildItem -LiteralPath "$root\Disc\sound_original" -Filter *.brstm | ForEach
 }
 # Built-in HD textures: the 4x BC3 DDS pack, Dolphin texture_replacements naming.
 Mirror "$root\Play\UserData\texture_replacements\SPM_HD_4x_BC3" "$engine\UserData\texture_replacements\SPM_HD_4x_BC3"
+# On-screen button prompts per controller type (tools\make-button-icons.py), picked by the controller in use.
+Mirror "$root\Play\UserData\button_icons" "$engine\UserData\button_icons"
 # Credits and licenses: GPLv3 for the engine, the bundled libraries' own license files.
 Copy-Item -LiteralPath "$PSScriptRoot\CREDITS.txt" -Destination "$stage\CREDITS.txt"
 Copy-Item -LiteralPath "$root\wiicompiled\LICENSE" -Destination "$stage\LICENSE.txt"
@@ -73,6 +75,9 @@ if ($Zip) {
 
 # Copy over the game folder, keeping what is not in the build (saves, Config.toml, mods, Disc\).
 $dist = $Install
+# Generated, not the player's: replaced whole, so files a newer build no longer makes don't linger (a stale icon there
+# wins over the current set).
+Remove-Tree "$dist\engine\UserData\button_icons"
 Mirror $stage $dist
 # Earlier layouts: the game in Play\ (carry the player's files into engine\UserData) and the public-release extras.
 if (Test-Path -LiteralPath "$dist\Play") {

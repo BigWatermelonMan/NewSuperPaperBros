@@ -18,6 +18,7 @@ with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the ga
 - Built-in higher-quality music and HD textures (community mods, see Credits)
 - Xbox, PlayStation and Nintendo gamepads plus keyboard, with press-to-bind remapping
 - The Wii Remote pointer (Tippi, the HOME menu) on the right stick or the mouse
+- On-screen buttons match your controller (Xbox, PlayStation or Nintendo), with a controls screen for it
 - Mods: drop-in folders that replace game files or textures
 - A launcher that installs the game from your own disc image
 
@@ -95,6 +96,7 @@ for regression checks.
 - **Higher-quality music:** the "SPM High Definition Audio" mod by Toadette Hack Fan and PaperToadette, with game
   patches by JohnP55
 - **HD textures:** converted from the "SPM Textures v1.0" HD texture pack
+- **Controller button icons and pictures:** "Input Prompts" by [Kenney](https://kenney.nl), CC0
 - **Dolphin Emulator** data files (DSP coefficients, Wii system files), GPL-2.0-or-later
 - Symbol names from the Super Paper Mario decompilation community ([spm-decomp](https://github.com/SeekyCt/spm-decomp))
 

@@ -8,6 +8,8 @@
 #include "runtime_log.h"
 #include "wii_remote_input.h"
 
+#include <aurora/aurora.h>
+
 #include <dolphin/pad.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_gamepad.h>
@@ -41,10 +43,13 @@ constexpr uint32_t kScreenLeft = kWpadUp, kScreenRight = kWpadDown, kScreenUp = 
 // What the game's motion code looks for (dGameKeyCore_c::setShakeY and the tilt code after
 // setConfigKey): a shake is acc.y changing by at least 0.28 g between consecutive frames on four
 // frames (gaps of up to two allowed), then a five-frame cool-down; the tilt angle is -acc.z, through
-// KPAD's acc_vertical, at 16384 angle units per g. A shake request swings y by +-1.2 g around rest
-// for at least kShakeFrames reads, enough for one detection, and holding it keeps shaking.
-constexpr float kShakeSwingG = 1.2f;
-constexpr int kShakeFrames = 10;
+// KPAD's acc_vertical, at 16384 angle units per g. Super Paper Mario (wpadMain 0x80234528, check
+// 0x80235180) instead averages acc.y over four frames at a time and wants a dip then a steep rise
+// (at least 1 g, 0.75 g per four frames); a swing flipping every frame averages to nothing there. So a
+// shake is one flick, added to rest acc.y: a quick dip, a steep rise, back to rest. All but one frame
+// change by at least 0.6 g, for the frame-to-frame check. Holding the button keeps flicking.
+constexpr float kShakeFlickG[] = {-0.8f, -1.6f, -0.6f, 0.4f, 1.4f, 2.4f, 2.4f, 1.2f, 0.0f};
+constexpr int kShakeFrames = static_cast<int>(std::size(kShakeFlickG));
 constexpr float kMaxTiltRadians = 0.7853982f;  // 45 degrees
 constexpr float kTiltFollow = 0.3f;            // share of the way to the requested tilt per frame
 constexpr float kTiltDeadZone = 0.25f;         // of the right stick's travel
@@ -61,8 +66,7 @@ struct Intent {
 };
 
 struct Motion {
-    int shakeFramesLeft = 0;
-    uint32_t shakePhase = 0;
+    int shakeFrame = kShakeFrames;  // the flick's next frame; kShakeFrames = at rest
     float tilt = 0.0f;
 };
 
@@ -235,6 +239,9 @@ bool PadInputHeld(SDL_Gamepad* gamepad, const PadInput& input) {
 Intent GamepadIntent() {
     Intent intent;
     const auto& layouts = PadLayouts();  // parsed (and bad [gamepad] entries logged) on the first read
+    // On-screen button prompts follow the pad last pressed (else the first one); none = the game's Wii Remote icons.
+    static int s_lastPressedStyle = -1;
+    int firstStyle = -1;
     int count = 0;
     SDL_JoystickID* ids = SDL_GetGamepads(&count);
     for (int i = 0; ids != nullptr && i < count; ++i) {
@@ -263,7 +270,10 @@ Intent GamepadIntent() {
         if (kind != WiiRemoteInput::Kind::NotWii && kind != WiiRemoteInput::Kind::WiiUPro) {
             continue;  // a real Wii Remote: the game reads it through KPAD
         }
-        const PadLayout& layout = layouts[StyleFor(gamepad)];
+        const PadStyle style = StyleFor(gamepad);
+        const PadLayout& layout = layouts[style];
+        if (firstStyle < 0) firstStyle = style;
+        const Intent before = intent;
         const auto held = [&](int action) {
             for (const PadInput& input : layout[action]) {
                 if (PadInputHeld(gamepad, input)) return true;
@@ -291,8 +301,11 @@ Intent GamepadIntent() {
         intent.shake = intent.shake || held(kShake);
         const float tilt = (held(kTiltRight) ? 1.0f : 0.0f) - (held(kTiltLeft) ? 1.0f : 0.0f);
         if (tilt != 0.0f) intent.tilt = tilt;
+        if (intent.buttons != before.buttons || intent.shake != before.shake) s_lastPressedStyle = style;
     }
     SDL_free(ids);
+    if (firstStyle < 0) s_lastPressedStyle = -1;
+    aurora_set_button_icon_style(s_lastPressedStyle >= 0 ? s_lastPressedStyle : firstStyle);
     return intent;
 }
 
@@ -347,8 +360,8 @@ Intent PadIntent(const PADStatus& pad) {
 // the right end and raises the left one, where the remote's pointer end is, so gravity shows up on
 // the remote's long axis (KPAD z) as +sin(angle).
 void ApplyMotion(Motion& motion, const Intent& intent, WiiRemoteInput::KpadSample& sample) {
-    if (intent.shake) {
-        motion.shakeFramesLeft = std::max(motion.shakeFramesLeft, kShakeFrames);
+    if (intent.shake && motion.shakeFrame >= kShakeFrames) {
+        motion.shakeFrame = 0;
     }
     motion.tilt += (intent.tilt - motion.tilt) * kTiltFollow;
     if (std::fabs(motion.tilt) < 0.001f) {
@@ -358,9 +371,8 @@ void ApplyMotion(Motion& motion, const Intent& intent, WiiRemoteInput::KpadSampl
     sample.acc[0] = 0.0f;
     sample.acc[1] = -std::cos(angle);
     sample.acc[2] = std::sin(angle);
-    if (motion.shakeFramesLeft > 0) {
-        --motion.shakeFramesLeft;
-        sample.acc[1] += (motion.shakePhase++ & 1u) != 0 ? kShakeSwingG : -kShakeSwingG;
+    if (motion.shakeFrame < kShakeFrames) {
+        sample.acc[1] += kShakeFlickG[motion.shakeFrame++];
     }
 }
 

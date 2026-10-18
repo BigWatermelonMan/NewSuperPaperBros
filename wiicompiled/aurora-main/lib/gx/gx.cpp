@@ -1341,8 +1341,22 @@ GXState::CopyTextureRef* find_copy_texture_for_texobj(const GXTexObj_& obj) noex
   return nullptr;
 }
 
+// New Super Paper Bros.: the last frame a texture from button_icons/<style>/marker<N> was drawn (the Controls screen
+// and its bubbles), so the overlay can show its own controls panel there (settings_overlay.cpp).
+std::atomic<u32> g_spmMarkerFrames[8];
+
 void resolve_sampled_textures(const ShaderInfo& info) noexcept {
   ZoneScoped;
+  if (gfx::texture_replacement::take_button_icon_style_change()) invalidate_static_texture_cache();
+  struct MarkerCheck {
+    const ShaderInfo& info;
+    ~MarkerCheck() {
+      for (u32 i = 0; i < MaxTextures; ++i)
+        if (info.sampledTextures.test(i) && g_gxState.textures[i].ref && g_gxState.textures[i].ref->spmMarker < 8 &&
+            g_gxState.textures[i].ref->spmMarker != 0)
+          g_spmMarkerFrames[g_gxState.textures[i].ref->spmMarker].store(gfx::current_frame() + 1, std::memory_order_relaxed);
+    }
+  } markerCheck{info};
 
   for (u32 i = 0; i < MaxTextures; ++i) {
     if (!info.sampledTextures.test(i)) {
