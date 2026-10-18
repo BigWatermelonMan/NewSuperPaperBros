@@ -34,6 +34,12 @@ static class Program
             try { Console.WriteLine(string.Join(" ", WiiSave.Import(args[1], args[2]))); return 0; }
             catch (Exception e) { Console.Error.WriteLine(e.Message); return 1; }
         }
+        // "--savekey <extracted disc> <out file>": the per-disc save key (matches the runtime's UserData\Saves\<key>).
+        if (args.Length == 3 && args[0] == "--savekey")
+        {
+            File.WriteAllText(args[2], WiiSave.GameSaveKey(args[1]));
+            return 0;
+        }
         // "--savetest <save folder> <scratch dir>": the folder's files survive a data.bin round trip (exit 0 ok, 1 not).
         if (args.Length == 3 && args[0] == "--savetest")
         {

@@ -16,8 +16,38 @@ static class WiiSave
     // The game's title id from its disc id ("R8PE01" -> 0001000052385045): saves live under it, per region.
     public static ulong TitleIdOf(string gameId) => 0x0001000000000000UL | BinaryPrimitives.ReadUInt32BigEndian(System.Text.Encoding.ASCII.GetBytes(gameId.PadRight(4)[..4]));
 
-    public static string DataDir(string userData, string gameId = "R8PE01") =>
-        Path.Combine(userData, "NAND", "title", "00010000", (TitleIdOf(gameId) & 0xFFFFFFFF).ToString("x8"), "data");
+    // The save folder the game uses for this disc. Like the runtime (nand_path.h ManagedNandRootPath): UserData\NAND
+    // belongs to the first disc played (its key in NAND\.game), every other disc gets Saves\<key>\NAND.
+    public static string DataDir(string userData, string discRoot, string gameId)
+    {
+        string nand = Path.Combine(userData, "NAND");
+        string key = GameSaveKey(discRoot);
+        string owner = "";
+        try { owner = File.ReadLines(Path.Combine(nand, ".game")).FirstOrDefault() ?? ""; } catch (IOException) { }
+        if (key.Length > 0 && owner.Length > 0 && owner != key) nand = Path.Combine(userData, "Saves", key, "NAND");
+        return Path.Combine(nand, "title", "00010000", (TitleIdOf(gameId) & 0xFFFFFFFF).ToString("x8"), "data");
+    }
+
+    // nand_path.h GameSaveKey: FNV-1a 64 over the extracted disc's files (relative path with '/', then the size as 8
+    // little-endian bytes), sorted by path; "" when the folder is missing or empty.
+    public static string GameSaveKey(string discRoot)
+    {
+        if (!Directory.Exists(discRoot)) return "";
+        var files = Directory.EnumerateFiles(discRoot, "*", SearchOption.AllDirectories)
+            .Select(f => (name: Path.GetRelativePath(discRoot, f).Replace('\\', '/'), size: new FileInfo(f).Length))
+            .OrderBy(f => f.name, StringComparer.Ordinal).ToList();
+        if (files.Count == 0) return "";
+        ulong hash = 1469598103934665603UL;
+        void Mix(ReadOnlySpan<byte> data) { foreach (byte b in data) hash = (hash ^ b) * 1099511628211UL; }
+        Span<byte> size = stackalloc byte[8];
+        foreach (var (name, length) in files)
+        {
+            Mix(System.Text.Encoding.UTF8.GetBytes(name));
+            BinaryPrimitives.WriteUInt64LittleEndian(size, (ulong)length);
+            Mix(size);
+        }
+        return hash.ToString("x16");
+    }
 
     // Copies the save into dataDir; an existing save there is moved to data.backup-<time> first. Returns the files written.
     public static List<string> Import(string source, string dataDir)

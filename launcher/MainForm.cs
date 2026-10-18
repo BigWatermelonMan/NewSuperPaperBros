@@ -167,6 +167,9 @@ sealed class MainForm : Form
         catch (Exception) { return ""; }
     }
 
+    // This disc's save folder (per disc region and per extracted disc, as the game keeps them).
+    string SaveDataDir() => WiiSave.DataDir(userData, DiscStatus().path, DiscGameId() is { Length: > 0 } id ? id : "R8PE01");
+
     // The packaged defaults: borderless 1080p, cinematic 2.39:1, 120 fps interpolation, HD textures. Keys the
     // user already has are left alone.
     void EnsureDefaults()
@@ -508,7 +511,7 @@ sealed class MainForm : Form
         this.tipRow = tipRow;
         var row = new FlowLayoutPanel { AutoSize = true, Margin = Padding.Empty };
         row.Controls.Add(Btn("Open game folder", (_, _) => Process.Start("explorer.exe", play), Paper));
-        row.Controls.Add(Btn("Open saves folder", (_, _) => Process.Start("explorer.exe", Directory.CreateDirectory(WiiSave.DataDir(userData, DiscGameId())).FullName), Paper));
+        row.Controls.Add(Btn("Open saves folder", (_, _) => Process.Start("explorer.exe", Directory.CreateDirectory(SaveDataDir()).FullName), Paper));
         row.Controls.Add(Btn("Import Wii / Dolphin save...", (_, _) => ImportSave(), Paper));
         body.Controls.Add(row);
         return card;
@@ -527,7 +530,7 @@ sealed class MainForm : Form
             InitialDirectory = dolphin ?? "",
         };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        var dataDir = WiiSave.DataDir(userData, DiscGameId());
+        var dataDir = SaveDataDir();
         if (Directory.Exists(dataDir) && Directory.EnumerateFiles(dataDir).Any() &&
             MessageBox.Show(this, "This replaces your current save files. They are kept as a backup next to them (data.backup-<date>).\n\nImport the save?",
                 "Import save", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;

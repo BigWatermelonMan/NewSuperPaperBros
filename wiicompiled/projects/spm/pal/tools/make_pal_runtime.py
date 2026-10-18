@@ -22,7 +22,8 @@ eu_rel = json.load(open(root / "game_pal/spm_rel_layout.json"))
 HEAP_SHIFT = EU_DOL_END - US_DOL_END  # heap 0 starts at the arena lo the runtime seeds (system_bridge.cpp)
 # Runtime-seeded memory layout values: MEM1 arena lo (bss end, 0x20-aligned) and arena hi (MEM1 end minus the disc's
 # 32-aligned fst.bin: PAL 69724 bytes).
-DATA_OVERRIDES = {0x80576720: 0x805B7740, 0x817EF720: 0x817EEFA0}
+DATA_OVERRIDES = {0x80576720: 0x805B7740, 0x817EF720: 0x817EEFA0,
+                  0x81700000: 0x81700000}  # main.cpp's boot stack seed is a fixed MEM1 address, not a heap object
 us_rel_secs = sorted((int(s["addr"], 16), int(s["size"], 16), int(eu_rel["sections"][k]["addr"], 16)) for k, s in us_rel["sections"].items())
 US_REL = (int(us_rel["image"], 16), int(us_rel["end"], 16))
 
