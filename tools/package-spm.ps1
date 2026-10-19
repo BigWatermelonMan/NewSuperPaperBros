@@ -70,10 +70,23 @@ foreach ($dir in Get-ChildItem -LiteralPath "$root\wiicompiled\Dependencies" -Di
 if (Get-ChildItem -LiteralPath $stage -Recurse -Directory | Where-Object { $_.Name -in 'Disc', 'DATA', 'sys' }) { throw 'disc folders in the build' }
 
 if ($Zip) {
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     $zipPath = "$root\dist\NewSuperPaperBros.zip"
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
-    [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
+    # Entry by entry with '/' separators: Windows PowerShell's CreateFromDirectory writes '\', which 7-Zip, WinRAR,
+    # Linux and macOS unpack as flat files named "NewSuperPaperBros\engine\..." (only Explorer copes).
+    $base = Split-Path -Parent $stage
+    $zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($item in Get-ChildItem -LiteralPath $stage -Recurse -Force) {
+            $name = $item.FullName.Substring($base.Length + 1).Replace('\', '/')
+            if (-not $item.PSIsContainer) {
+                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $item.FullName, $name, [IO.Compression.CompressionLevel]::Optimal)
+            } elseif (-not (Get-ChildItem -LiteralPath $item.FullName -Force)) {
+                [void]$zip.CreateEntry("$name/")  # keep empty folders (UserData\mods)
+            }
+        }
+    } finally { $zip.Dispose() }
     Write-Host "ZIP: $zipPath"
 }
 
