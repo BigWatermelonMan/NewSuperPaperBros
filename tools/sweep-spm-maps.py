@@ -212,6 +212,10 @@ def prepare(root, out, exe, disc):
     config = re.sub(r"(?m)^dvd_root\s*=.*$", lambda _: f"dvd_root = '{disc}'", config)  # --disc (the PAL dump in Disc_PAL)
     if os.environ.get('SPM_SWEEP_LANGUAGE'):  # PAL engine: en fr de es it ([game] language, SCGetLanguage)
         config = re.sub(r'(?ms)\n\[game\].*?(?=\n\[|\Z)', '', config) + f"\n[game]\nlanguage = \"{os.environ['SPM_SWEEP_LANGUAGE']}\"\n"
+    if not re.search(r'(?m)^\[audio\]', config):  # silent: the user works while sweeps run
+        config += '\n[audio]\nmuted = true\n'
+    else:
+        config = re.sub(r'(?m)^\[audio\]\n', '[audio]\nmuted = true\n', re.sub(r'(?m)^muted\s*=.*\n', '', config), count=1)
     (data / 'Config.toml').write_text(config, encoding='utf-8')
     return play
 

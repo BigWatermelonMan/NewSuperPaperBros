@@ -2353,7 +2353,7 @@ static void spm_dump_draw(const char* path, u8 prim, u32 fmt, u32 count, u32 vtx
     static int clipLogged = 0;
     const auto& pa = g_gxState.arrays[GX_VA_POS];
     const auto& pf = g_gxState.vtxFmts[fmt].attrs[GX_VA_POS];
-    if (clipLogged < 6000 && prim == 0x98 && v && pa.data != nullptr && g_gxState.vtxDesc[GX_VA_POS] == GX_INDEX16 &&
+    if ((clipLogged < 6000 || g_spmSweepDump) && prim == 0x98 && v && pa.data != nullptr && g_gxState.vtxDesc[GX_VA_POS] == GX_INDEX16 &&
         pf.type == GX_S16 && vtxSize >= pre + 2) {
       ++clipLogged;
       float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f, z0 = 1e9f, z1 = -1e9f;
@@ -2390,11 +2390,11 @@ static void spm_dump_draw(const char* path, u8 prim, u32 fmt, u32 count, u32 vtx
         static int stLogged = 0;
         const auto& rv = g_gxState.renderViewport;
         const auto& rs = g_gxState.renderScissor;
-        if (stLogged++ < 6000)
-          Log.warn("[spmst] {} be {} frz {} {:.4f},{:.4f},{:.4f},{} cu {} au {} zc {} zf {} zu {} blend {} lop {} pn {} vp {:.0f},{:.0f} {:.0f}x{:.0f} z {:.2f}-{:.2f} sc {},{} {}x{} chans {} tg {} tev {} bbox {:.2f},{:.2f}..{:.2f},{:.2f}",
+        if (stLogged++ < 6000 || g_spmSweepDump)
+          Log.warn("[spmst] {} be {} frz {} {:.4f},{:.4f},{:.4f},{} cu {} au {} zc {} zf {} zu {} blend {} lop {} pn {} vp {:.0f},{:.0f} {:.0f}x{:.0f} z {:.2f}-{:.2f} sc {},{} {}x{} chans {} tg {} tev {} bbox {:.2f},{:.2f}..{:.2f},{:.2f} oz {:.7f}..{:.7f}",
                    path, be, g_gxState.zFreeze, g_gxState.zFreezePlane.x(), g_gxState.zFreezePlane.y(), g_gxState.zFreezePlane.z(), g_gxState.zFreezePlane.w(), g_gxState.colorUpdate, g_gxState.alphaUpdate, g_gxState.depthCompare, (int)g_gxState.depthFunc, g_gxState.depthUpdate, (int)g_gxState.blendMode,
                    (int)g_gxState.blendOp, g_gxState.currentPnMtx, rv.left, rv.top, rv.width, rv.height, rv.znear, rv.zfar, rs.x, rs.y,
-                   rs.width, rs.height, g_gxState.numChans, g_gxState.numTexGens, g_gxState.numTevStages, x0, y0, x1, y1);
+                   rs.width, rs.height, g_gxState.numChans, g_gxState.numTexGens, g_gxState.numTevStages, x0, y0, x1, y1, z0, z1);
       }
       const auto& to = g_gxState.loadedTextures[0];
       unsigned sum = 0, nz = 0;

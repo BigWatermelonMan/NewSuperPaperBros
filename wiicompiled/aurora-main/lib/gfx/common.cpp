@@ -1371,13 +1371,15 @@ static void render_pass_impl(const wgpu::RenderPassEncoder& pass, const std::vec
 static void render_impl(std::vector<RenderPass>& renderPasses, wgpu::CommandEncoder& cmd, int32_t interpolatedFrame,
                         bool finalize, DebugFrameData& debugFrame, const depth_peek::FrameMapping& depthMapping) {
   ZoneScoped;
-  // Palette conversions, MSAA resolves and EFB copies depend on sealed frame state, not on the
-  // interpolation weight, so encode them on the native render and let replay slots sample them.
-  const bool encodeTextureBakes = interpolatedFrame < 0;
+  // Palette conversions and EFB copies run in every slot, in pass order: replay slots are encoded
+  // before the native render, so skipping them made a slot sample copies this frame had not made yet
+  // (the 2-1 mansion behind the 3D mountain layers vanished in every in-between frame, issue #24).
+  const bool encodeTextureBakes = true;
+  const bool nativeSlot = interpolatedFrame < 0;
   {  // SPM diagnostic (env SPM_PASS_LOG): every 300th frame, the render passes with their clears and command counts
     static const bool passLog = std::getenv("SPM_PASS_LOG") != nullptr;
     static u32 calls = 0, logged = 0;
-    if (passLog && encodeTextureBakes && ++calls % 300 == 0 && logged++ < 12) {
+    if (passLog && nativeSlot && ++calls % 300 == 0 && logged++ < 12) {
       std::fprintf(stderr, "[spmpass] frame call %u: %zu passes\n", calls, renderPasses.size());
       for (u32 i = 0; i < renderPasses.size(); ++i) {
         const auto& p = renderPasses[i];

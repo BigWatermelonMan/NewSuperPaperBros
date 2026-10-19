@@ -342,10 +342,11 @@ struct Sweep {
                     for (unsigned& c : g_spmAudit) c = 0;
                     RT_LOGF(RT_TAG_RUNTIME, "[spmsweep] loaded %s\n", name.c_str());
                 }
-                {   // draw dump of 2 frames, 200 frames after load, for the map named in SPM_SWEEP_DUMP
+                {   // draw dump of 2 frames, SPM_SWEEP_DUMP_FRAME (default 200) frames after load, for the map named in SPM_SWEEP_DUMP
                     static const char* dumpMap = std::getenv("SPM_SWEEP_DUMP");
+                    static const unsigned dumpAt = [] { const char* e = std::getenv("SPM_SWEEP_DUMP_FRAME"); return e ? unsigned(std::atoi(e)) : 200u; }();
                     const unsigned rel = frames - firstFrame;
-                    g_spmSweepDump = (dumpMap && name == dumpMap && rel >= 200 && rel < 202) ? 1 : 0;
+                    g_spmSweepDump = (dumpMap && name == dumpMap && rel >= dumpAt && rel < dumpAt + 2) ? 1 : 0;
                 }
                 if (time - stable >= std::chrono::seconds(dwellSeconds) && frames - firstFrame >= 10) {
                     // fadeIsFinish(): 0 means a screen fade/curtain is still active, so a black shot is not a render bug.
