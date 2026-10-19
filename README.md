@@ -1,7 +1,7 @@
 # New Super Paper Bros.
 
 A native PC port of **Super Paper Mario** (Wii, 2007), made by statically recompiling the game's PowerPC code to C++
-with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the game runs as a Windows program.
+with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the game runs as a Windows or Linux program.
 
 ![Flipside in cinematic 2.39:1 widescreen](screenshots/mac_02_cinematic.png)
 
@@ -52,6 +52,10 @@ to switch them on and off.
 
 **Updating:** unzip a new release over the old folder. Your disc, saves, settings and mods are kept.
 
+**Linux:** download `NewSuperPaperBros-linux.tar.gz` instead, unpack it and open `New Super Paper Bros` (the same
+launcher). You need 64-bit Linux from 2022 or newer (glibc 2.35) with Vulkan graphics drivers. Linux support is new:
+please report problems in [Issues](../../issues).
+
 ## Building from source
 
 You need Windows, Python 3 and your own disc image. The toolchain (LLVM/MinGW, CMake, the .NET 8 SDK) is downloaded
@@ -73,6 +77,9 @@ powershell -ExecutionPolicy Bypass -File tools\package-spm.ps1 -Zip
 The packager also expects the HQ music mod in `Disc\DATA\files\sound` (originals in `Disc\sound_original`) and the
 HD texture pack in `Play\UserData\texture_replacements\SPM_HD_4x_BC3`.
 
+For Linux, after those steps run `bash tools/build-linux.sh` and `bash tools/build-linux.sh --pal` in WSL (Ubuntu
+22.04) or on Linux, then `bash tools/package-linux.sh` for `dist/NewSuperPaperBros-linux.tar.gz`.
+
 `build-spm.ps1` translates the game and compiles it into `Play\SuperPaperMario.exe`; `package-spm.ps1` assembles the
 release folder in `dist\` (`-Zip` also writes the zip). `tools\sweep-spm-maps.py` loads every map and screenshots it
 for regression checks.
@@ -84,6 +91,7 @@ for regression checks.
 | `wiicompiled/aurora-main` | Aurora: Wii GX on WebGPU (Dawn / Direct3D 12) |
 | `wiicompiled/projects/spm` | This game's project: symbols and function map |
 | `launcher` | The launcher (C# WinForms): disc setup, display options, controls, mods |
+| `launcher/linux` | The same launcher for Linux (C# Avalonia) |
 | `tools` | Build, package and test scripts |
 
 ## Credits

@@ -200,7 +200,10 @@ def prepare(root, out, exe, disc):
     for key, value in dict(window_width=win_w, window_height=win_h, texture_replacements=os.environ.get('SPM_SWEEP_TEXREPL', 'false'), texture_dumps=os.environ.get('SPM_SWEEP_TEXDUMP', 'false'),
                            display_mode='"windowed"', resolution_multiplier=os.environ.get('SPM_SWEEP_RES', '1.0'),
                            aspect_mode=os.environ.get('SPM_SWEEP_ASPECT', '2'),
-                           frame_interpolation_fps=os.environ.get('SPM_SWEEP_INTERP', '0')).items():
+                           frame_interpolation_fps=os.environ.get('SPM_SWEEP_INTERP', '0'),
+                           # off-screen (PrintWindow still captures it) so sweeps don't cover the user's desktop; SPM_SWEEP_ONSCREEN=1 shows it
+                           window_x='100' if os.environ.get('SPM_SWEEP_ONSCREEN') else '-4000', window_y='100',
+                           graphics_api=f'"{os.environ.get("SPM_SWEEP_GRAPHICS", "auto")}"').items():  # auto | d3d12 | vulkan
         config, n = re.subn(rf'(?m)^{key}\s*=.*$', f'{key} = {value}', config)
         if not n:  # key absent from the user's file: add it under [video]
             config = config.replace('[video]\n', f'[video]\n{key} = {value}\n', 1)

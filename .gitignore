@@ -42,3 +42,6 @@ AGENTS.md
 __pycache__/
 *.pyc
 wiicompiled/buildtools/artifacts/
+launcher/linux/bin/
+launcher/linux/obj/
+launcher/linux/publish/

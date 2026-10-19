@@ -17,4 +17,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>pixl.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- linux\ is its own project (nspb-disc) -->
+    <Compile Remove="linux/**" />
+    <None Remove="linux/**" />
+  </ItemGroup>
 </Project>

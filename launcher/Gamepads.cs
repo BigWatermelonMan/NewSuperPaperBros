@@ -77,7 +77,7 @@ static partial class Gamepads
     {
         try
         {
-            var dll = NativeLibrary.Load(Path.Combine(playDir, "SDL3.dll"));
+            var dll = NativeLibrary.Load(Path.Combine(playDir, OperatingSystem.IsWindows() ? "SDL3.dll" : "libSDL3.so.0"));  // the Linux launcher ships libSDL3.so.0 in engine/
             NativeLibrary.SetDllImportResolver(typeof(Gamepads).Assembly, (name, _, _) => name == "SDL3" ? dll : IntPtr.Zero);
             SDL_SetHint("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");  // SDL has no window of its own here
             ready = SDL_Init(SDL_INIT_GAMEPAD);

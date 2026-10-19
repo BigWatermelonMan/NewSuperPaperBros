@@ -21,3 +21,7 @@ $proj = Join-Path $root 'launcher\NewSuperPaperBros.Launcher.csproj'
 & $dotnet publish $proj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o (Join-Path $root 'launcher\publish')
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
 Write-Host "DONE: $root\launcher\publish\New Super Paper Bros.exe"
+# The Linux launcher (launcher\linux: the same pages in Avalonia), packed by tools/package-linux.sh.
+& $dotnet publish (Join-Path $root 'launcher\linux\NewSuperPaperBros.Linux.csproj') -c Release -o (Join-Path $root 'launcher\linux\publish')
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish (Linux launcher) failed ($LASTEXITCODE)" }
+Write-Host "DONE: $root\launcher\linux\publish\New Super Paper Bros"
