@@ -76,17 +76,17 @@ if ($Zip) {
     # Entry by entry with '/' separators: Windows PowerShell's CreateFromDirectory writes '\', which 7-Zip, WinRAR,
     # Linux and macOS unpack as flat files named "NewSuperPaperBros\engine\..." (only Explorer copes).
     $base = Split-Path -Parent $stage
-    $zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
+    $archive = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
     try {
         foreach ($item in Get-ChildItem -LiteralPath $stage -Recurse -Force) {
             $name = $item.FullName.Substring($base.Length + 1).Replace('\', '/')
             if (-not $item.PSIsContainer) {
-                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $item.FullName, $name, [IO.Compression.CompressionLevel]::Optimal)
+                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $item.FullName, $name, [IO.Compression.CompressionLevel]::Optimal)
             } elseif (-not (Get-ChildItem -LiteralPath $item.FullName -Force)) {
-                [void]$zip.CreateEntry("$name/")  # keep empty folders (UserData\mods)
+                [void]$archive.CreateEntry("$name/")  # keep empty folders (UserData\mods)
             }
         }
-    } finally { $zip.Dispose() }
+    } finally { $archive.Dispose() }
     Write-Host "ZIP: $zipPath"
 }
 
