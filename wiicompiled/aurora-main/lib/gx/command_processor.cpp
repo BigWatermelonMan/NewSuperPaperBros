@@ -872,7 +872,11 @@ static void handle_bp(u32 value, bool bigEndian) {
     g_gxState.invalidateXfReg(0x09);
     g_gxState.numTevStages = bp_get(value, 4, 10) + 1;
     static const bool noZFreeze = std::getenv("SPM_NO_ZFREEZE") != nullptr;  // diagnostic A/B for coplanar mode
-    if (!g_replayingDisplayList) g_gxState.zFreeze = !noZFreeze && bp_get(value, 1, 19) != 0;
+    // Display lists switch coplanar too: SPM's hedge and fence materials turn it off inside their lists. Ignoring those
+    // writes kept the hedges frozen to the ground's depth plane, hidden behind walls in 3D (2-2, issue #32), and hid
+    // Mario in coplanar scenes. SPM_ZFREEZE_KEEP_DL=1 restores the old behaviour for comparison.
+    static const bool keepDlZFreeze = std::getenv("SPM_ZFREEZE_KEEP_DL") != nullptr;
+    if (!g_replayingDisplayList || !keepDlZFreeze) g_gxState.zFreeze = !noZFreeze && bp_get(value, 1, 19) != 0;
     else  // keep the cached register honest so the game's own coplanar-off write is not deduplicated away
       g_gxState.bpRegCache[0x00] = (g_gxState.bpRegCache[0x00] & ~(1u << 19)) | (u32(g_gxState.zFreeze) << 19);
     u32 hwCull = bp_get(value, 2, 14);
