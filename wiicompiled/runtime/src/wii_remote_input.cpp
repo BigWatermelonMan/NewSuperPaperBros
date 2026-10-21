@@ -187,7 +187,19 @@ bool ScriptedSample(uint32_t chan, KpadSample& sample) {
         const ScriptEvent& event = script.events[i];
         if (event.chan == chan && now >= event.startMs && now < event.endMs) {
             sample.hold |= event.bits & ~kScriptPoint;
-            sample.pointerValid = sample.pointerValid || (event.bits & kScriptPoint) != 0;
+            if ((event.bits & kScriptPoint) != 0) {
+                sample.pointerValid = true;
+                // NSMBW_SCRIPT_POINT="x,y" (-1..1) moves POINT off the centre; it sweeps left-right over time if x is "sweep"
+                static const char* where = std::getenv("NSMBW_SCRIPT_POINT");
+                if (where != nullptr) {
+                    if (std::strncmp(where, "sweep", 5) == 0) {
+                        sample.pointer[0] = static_cast<float>(std::sin(static_cast<double>(now) / 700.0)) * 0.8f;
+                        sample.pointer[1] = static_cast<float>(std::cos(static_cast<double>(now) / 1100.0)) * 0.5f;
+                    } else {
+                        std::sscanf(where, "%f,%f", &sample.pointer[0], &sample.pointer[1]);
+                    }
+                }
+            }
             if (!announced[i]) {
                 announced[i] = true;
                 RT_LOGF(RT_TAG_RUNTIME, "scripted input at %llu ms: %s\n", static_cast<unsigned long long>(now),

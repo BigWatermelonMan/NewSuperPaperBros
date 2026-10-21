@@ -8,6 +8,7 @@
 #include <aurora/event.h>
 #include <dolphin/gx/GXAurora.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <atomic>
 #include <chrono>
@@ -64,7 +65,12 @@ inline void Flush(bool force = false) {
     settings_overlay::ReleaseControllers();
     WindowPlacementPersistence::Flush(true);
 #if defined(_WIN32)
-    ::ExitProcess(0);
+    // Not ExitProcess: the engine is a DLL (engine_usa/engine_pal), and ExitProcess runs its static destructors after
+    // the other threads are gone; a still-joinable std::thread then calls std::terminate and the fatal popup hangs
+    // the close (issue #38). Nothing is left to save here.
+    std::fflush(nullptr);
+    ::TerminateProcess(::GetCurrentProcess(), 0);
+    std::_Exit(EXIT_SUCCESS);
 #else
     std::_Exit(EXIT_SUCCESS);
 #endif

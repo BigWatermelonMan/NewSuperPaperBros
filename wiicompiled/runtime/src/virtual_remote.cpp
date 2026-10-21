@@ -78,6 +78,14 @@ std::atomic<bool> g_touchShake{false};
 std::atomic<bool> g_touchShakeSinceRead{false};
 std::atomic<float> g_touchTilt{0.0f};
 
+// In one of SPM's arcade minigames (maps mg*: Forget Me Not, Mansion Patrol, Tilt Island ...)? The map name sits at
+// +0x44 of the spmario globals (gp).
+bool InArcade() {
+    uint32_t gp = 0;
+    return Memory::TryRead32(0x8056D198u, gp) && Memory::Contains(gp, 0x48) && Memory::Read8(gp + 0x44) == 'm' &&
+           Memory::Read8(gp + 0x45) == 'g';
+}
+
 std::mutex g_mutex;
 std::array<PADStatus, PAD_MAX_CONTROLLERS> g_pads{};
 uint64_t g_padsReadNs = 0;
@@ -301,6 +309,8 @@ Intent GamepadIntent() {
         intent.shake = intent.shake || held(kShake);
         const float tilt = (held(kTiltRight) ? 1.0f : 0.0f) - (held(kTiltLeft) ? 1.0f : 0.0f);
         if (tilt != 0.0f) intent.tilt = tilt;
+        // Tilt Island and the other arcade games steer by tilting the remote: there the left stick tilts it too.
+        else if (std::fabs(sx) >= kTiltDeadZone && InArcade()) intent.tilt = std::clamp(sx, -1.0f, 1.0f);
         if (intent.buttons != before.buttons || intent.shake != before.shake) s_lastPressedStyle = style;
     }
     SDL_free(ids);
@@ -433,6 +443,9 @@ void UpdatePointer(WiiRemoteInput::KpadSample& sample) {
     const uint64_t now = SDL_GetTicksNS();
     const float dt = lastNs ? std::min(0.1f, static_cast<float>(now - lastNs) / 1e9f) : 0.0f;
     lastNs = now;
+    // Arcade minigames aim with the pointer the whole time: once the stick has brought it up it stays, where it was,
+    // instead of hiding after kLingerNs (issue #35).
+    if (InArcade() && visibleUntilNs != 0) visibleUntilNs = now + kLingerNs;
     const bool wasVisible = now < visibleUntilNs;
     const auto aim = [&](bool fromMouse) {
         if (!wasVisible && !fromMouse) pos[0] = pos[1] = 0.0f;  // the stick brings it up in the middle

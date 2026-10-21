@@ -97,7 +97,7 @@ def refs(read, a, size, sda, sda2):
 
 
 # Data addresses: paired functions of equal size reference the same globals at the same instruction; majority vote.
-US_READ, EU_READ = dol(root / "game/main.dol.orig"), dol(root / "game_pal/main.dol")
+US_READ, EU_READ = dol(root / "game/main.dol.orig"), dol(root / "game_pal/main.dol.orig")
 votes = defaultdict(Counter)
 for name, us in US.items():
     for ua, usize, kind in us:

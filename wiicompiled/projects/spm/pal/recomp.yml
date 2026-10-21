@@ -21,7 +21,7 @@ memory:
 inputs:
   dol:
     path: ../../game_pal/main.dol
-    sha256: c853aafb4beb7504d5ab8c81445c3dc7cc244a4486c70d9eaed71639c41049cf
+    sha256: b3c3f0d7609f33a6cac5e039895e288ad51ef8fa47d69144299d14c9edfb447a  # HQ audio mod code patches at 0x8023BED4, 0x8023C218 (original: game_pal/main.dol.orig)
   # relF.bin pre-linked offline by projects/spm/tools/prelink_spm_rel.py at its boot heap address
   # (image 0x80C40000, bss 0x80F5EB20: above where relmgr's __memAlloc lands in any language; runtime/src/hle/spm_rel_pin.cpp pads the heap up to it. The USA image is 0x80BF6840).
   rel:

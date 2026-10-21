@@ -64,7 +64,7 @@ def dol(path):
                 return b[off + a - addr: off + a - addr + n]
         return b""
     return read
-US_READ, EU_READ = dol(root / "game/main.dol.orig"), dol(root / "game_pal/main.dol")
+US_READ, EU_READ = dol(root / "game/main.dol.orig"), dol(root / "game_pal/main.dol.orig")
 US_TEXT_END = 0x80319180
 def skeleton(read, a):
     w = struct.unpack(">12I", read(a, 48)) if len(read(a, 48)) == 48 else ()

@@ -348,6 +348,16 @@ struct Sweep {
                     const unsigned rel = frames - firstFrame;
                     g_spmSweepDump = (dumpMap && name == dumpMap && rel >= dumpAt && rel < dumpAt + 2) ? 1 : 0;
                 }
+                {   // SPM_SWEEP_WPAD: wpadmgr state once a second (cursor flag, pointingPos[0], KPAD pos/dpd of the newest status)
+                    static const bool wpadLog = std::getenv("SPM_SWEEP_WPAD") != nullptr;
+                    uint32_t wp = 0;
+                    if (wpadLog && (frames - firstFrame) % 60 == 0 && Memory::TryRead32(0x80574F20u - 0x7D68u, wp) && Memory::Contains(wp, 0x9DC8)) {
+                        const uint32_t st = wp + 0x6C;
+                        RT_LOGF(RT_TAG_RUNTIME, "[spmwpad] flags %08X pointing %.3f,%.3f kpad pos %.3f,%.3f dpd %u hold %08X\n",
+                                Memory::Read32(wp), Memory::ReadFloat32(wp + 0x4C), Memory::ReadFloat32(wp + 0x50),
+                                Memory::ReadFloat32(st + 0x20), Memory::ReadFloat32(st + 0x24), Memory::Read8(st + 0x5E), Memory::Read32(st));
+                    }
+                }
                 if (time - stable >= std::chrono::seconds(dwellSeconds) && frames - firstFrame >= 10) {
                     // fadeIsFinish(): 0 means a screen fade/curtain is still active, so a black shot is not a render bug.
                     CpuContext fadeCall = *cpu;

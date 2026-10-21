@@ -69,6 +69,15 @@ extern "C" uint32_t WPADGetDpdSensitivity_HLE()
 }
 PPC_NATIVE_OVERRIDE(802D0874, WPADGetDpdSensitivity_HLE, uint32_t, (), ());
 
+// The emulated remotes always have their pointer camera on (KPAD pos comes from the right stick or mouse). The real
+// library function read WPAD's own channel state, which this HLE never sets, so SPM's arcade minigames (Mansion
+// Patrol, Forget Me Not) saw the pointer as off and ignored it (issue #35).
+extern "C" uint32_t WPADIsDpdEnabled_HLE()
+{
+    return 1;
+}
+PPC_NATIVE_OVERRIDE(802D087C, WPADIsDpdEnabled_HLE, uint32_t, (), ());
+
 extern "C" int32_t WPADInitSub_HLE()
 {
     if (!g_state.initSubRan) {
