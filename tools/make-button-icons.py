@@ -55,6 +55,9 @@ TEXTURES = [
     ("tex1_56x56_ff3270a64a8b87b2_5.png", "face", [("A", 0.507, 0.385, 0.15)]),
     ("tex1_56x72_38dcf921a993679a_5.png", "face", [("2", 0.504, 0.368, 0.15)]),
     ("tex1_168x136_42b4c0a037f4bbee_5.png", "tippi", [("stick", 0, 0, 0)]),
+    # <icon PAD> (wicon.tpl #0), the whole remote in "Shake [remote] to recover!" and the other shake prompts (also
+    # "Point"/"Tilt", rarer): the shake button instead, or a controller player can't tell what to press.
+    ("tex1_96x40_61b1a30a17d36df5_5.png", "shake", [("shake", 0.5, 0.5, 0.5)]),
     ("tex1_248x184_fd844c6227d275cf_5.png", "none", []),  # the Controls screen's "Move" bubble (arrow cut only)
     ("tex1_248x200_55ef64a9d7e806f7_5.png", "none", []),
 ]
@@ -205,6 +208,12 @@ def render(src, kind, buttons, style):
             continue
         if kind == "tippi":
             tippi(img, style)
+        elif kind == "shake":  # the button alone, centred, dark with a white letter (the prompts sit on white boxes)
+            img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            icon = render_svg(style, name, int(h * 0.92))
+            at = ((w - icon.width) // 2, (h - icon.height) // 2)
+            img.alpha_composite(solid((20, 20, 20, 255), icon.getchannel("A")), at)
+            img.alpha_composite(solid((255, 255, 255, 255), holes(icon)), at)
         elif kind == "disc":
             x0, y0, x1, y1 = dark_bbox(img, fx * w, fy * h, fr * max(w, h), 150 if button in "+-" else 90)
             pad = (x1 - x0) * 0.05

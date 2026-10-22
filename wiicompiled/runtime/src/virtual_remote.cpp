@@ -47,8 +47,10 @@ constexpr uint32_t kScreenLeft = kWpadUp, kScreenRight = kWpadDown, kScreenUp = 
 // 0x80235180) instead averages acc.y over four frames at a time and wants a dip then a steep rise
 // (at least 1 g, 0.75 g per four frames); a swing flipping every frame averages to nothing there. So a
 // shake is one flick, added to rest acc.y: a quick dip, a steep rise, back to rest. All but one frame
-// change by at least 0.6 g, for the frame-to-frame check. Holding the button keeps flicking.
-constexpr float kShakeFlickG[] = {-0.8f, -1.6f, -0.6f, 0.4f, 1.4f, 2.4f, 2.4f, 1.2f, 0.0f};
+// change by at least 0.6 g, for the frame-to-frame check. Holding the button keeps flicking. The action commands
+// ("Shake up and down!", "Shake to recover!") want a hard shake: at half this size the item meter didn't move at
+// all, at three quarters it filled (tested with Thunder Rage in 1-1, the input script's SHAKE).
+constexpr float kShakeFlickG[] = {-1.6f, -4.4f, -1.2f, 0.8f, 2.8f, 4.8f, 4.8f, 2.4f, 0.0f};
 constexpr int kShakeFrames = static_cast<int>(std::size(kShakeFlickG));
 constexpr float kMaxTiltRadians = 0.7853982f;  // 45 degrees
 constexpr float kTiltFollow = 0.3f;            // share of the way to the requested tilt per frame
@@ -74,6 +76,7 @@ struct Motion {
 // latches keep a press shorter than one 60 Hz input read (a quick tap) visible for one read.
 std::atomic<uint32_t> g_touchButtons{0};
 std::atomic<uint32_t> g_touchButtonsSinceRead{0};
+std::atomic<uint32_t> g_lastButtons{0};  // player 1's WPAD buttons from the last Sample (LastButtons)
 std::atomic<bool> g_touchShake{false};
 std::atomic<bool> g_touchShakeSinceRead{false};
 std::atomic<float> g_touchTilt{0.0f};
@@ -553,9 +556,12 @@ bool Sample(uint32_t chan, WiiRemoteInput::KpadSample& sample) {
     // game's copy after that check.
     sample = {};
     sample.hold = intent.buttons;
+    if (chan == 0) g_lastButtons.store(intent.buttons, std::memory_order_relaxed);
     ApplyMotion(g_motion[chan], intent, sample);
     if (chan == 0) UpdatePointer(sample);
     return true;
 }
+
+uint32_t LastButtons() { return g_lastButtons.load(std::memory_order_relaxed); }
 
 } // namespace VirtualRemote

@@ -66,6 +66,7 @@ enum RawWiiButton : int {
 
 // WPAD_BUTTON_* bits as the game reads them from KPADStatus.hold.
 constexpr uint32_t kScriptPoint = 0x40000000;  // not a WPAD bit: input_script "POINT"
+constexpr uint32_t kScriptShake = 0x20000000;  // not a WPAD bit: input_script "SHAKE", the gamepad's shake flick
 constexpr uint32_t kWpadLeft = 0x0001, kWpadRight = 0x0002, kWpadDown = 0x0004, kWpadUp = 0x0008,
                    kWpadPlus = 0x0010, kWpadTwo = 0x0100, kWpadOne = 0x0200, kWpadB = 0x0400, kWpadA = 0x0800,
                    kWpadMinus = 0x1000, kWpadZ = 0x2000, kWpadC = 0x4000, kWpadHome = 0x8000;
@@ -102,6 +103,7 @@ uint32_t ScriptButtonBit(const std::string& name) {
     if (name == "MINUS") return kWpadMinus;
     if (name == "HOME") return kWpadHome;
     if (name == "POINT") return kScriptPoint;  // test: remote aimed at the screen centre (emulated IR pointer)
+    if (name == "SHAKE") return kScriptShake;  // test: shaking, as the gamepad's shake button does (repeats while held)
     if (name == "UP") return kWpadUp;
     if (name == "DOWN") return kWpadDown;
     if (name == "LEFT") return kWpadLeft;
@@ -192,10 +194,12 @@ bool ScriptedSample(uint32_t chan, KpadSample& sample) {
     const uint64_t now = clockMs() - originMs;
     sample = {};
     sample.acc[1] = -1.0f;  // at rest, KPAD frame
+    bool shaking = false;
     for (size_t i = 0; i < script.events.size(); ++i) {
         const ScriptEvent& event = script.events[i];
         if (event.chan == chan && now >= event.startMs && now < event.endMs) {
-            sample.hold |= event.bits & ~kScriptPoint;
+            sample.hold |= event.bits & ~(kScriptPoint | kScriptShake);
+            shaking = shaking || (event.bits & kScriptShake) != 0;
             if ((event.bits & kScriptPoint) != 0) {
                 sample.pointerValid = true;
                 // NSMBW_SCRIPT_POINT="x,y" (-1..1) moves POINT off the centre; it sweeps left-right over time if x is "sweep"
@@ -219,6 +223,11 @@ bool ScriptedSample(uint32_t chan, KpadSample& sample) {
             }
         }
     }
+    // The gamepad's shake flick (virtual_remote.cpp kShakeFlickG), one value per read, restarting while held.
+    static constexpr float kFlick[] = {-1.6f, -4.4f, -1.2f, 0.8f, 2.8f, 4.8f, 4.8f, 2.4f, 0.0f};
+    static size_t flickFrame = std::size(kFlick);
+    if (shaking && flickFrame >= std::size(kFlick)) flickFrame = 0;
+    if (flickFrame < std::size(kFlick)) sample.acc[1] += kFlick[flickFrame++];
     return true;
 }
 

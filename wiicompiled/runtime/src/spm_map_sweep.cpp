@@ -322,6 +322,16 @@ struct Sweep {
                 uint32_t gp = 0;
                 if (Memory::TryRead32(kGp, gp) && Memory::Contains(gp, 0x546)) Memory::Write8(gp + 0x545, uint8_t(std::atoi(g1)));
             }
+            if (const char* item = std::getenv("SPM_GIVE_ITEM")) {  // test: pouchAddItem(id) once, e.g. 67 Thunder Rage
+                static bool given = false;
+                if (!given) {
+                    given = true;
+                    CpuContext add = *cpu;
+                    add.gpr[3] = static_cast<uint32_t>(std::atoi(item));
+                    InvokeIndirectCpu(0x8014CB04, &add);
+                    RT_LOGF(RT_TAG_RUNTIME, "[spmsweep] gave item %s\n", item);
+                }
+            }
             CpuContext call = *cpu;
             call.gpr[3] = 3;  // seqSetSeq(SEQ_MAPCHANGE, mapName, nullptr).
             call.gpr[4] = buffer;

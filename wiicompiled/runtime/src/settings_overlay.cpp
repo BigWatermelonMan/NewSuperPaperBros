@@ -22,6 +22,7 @@ extern "C" uint8_t* aurora_load_png_rgba(const char* path, uint32_t* width, uint
 #include "runtime_log.h"
 #include "memory.h"
 #include "wii_remote_input.h"
+#include "virtual_remote.h"
 
 #include <imgui.h>
 #include <SDL3/SDL_events.h>
@@ -1984,7 +1985,17 @@ void DrawControlsPanel() {
     // The screen is up while the remote's body (marker 1) and its Move bubble (marker 2, on every version of it) are
     // drawn: either alone also appears elsewhere, and a panel opened there could not be closed (issue #7).
     const bool screenUp = aurora_button_icon_marker(1) && (seen[2] || aurora_button_icon_marker(2));
-    if (style < 0 || style > 2 || !screenUp) {
+    // A new press of - or 1 hides the panel until the screen goes: both close the game's screen, and if the panel
+    // ever opens over something else (issue #7, a Switch Pro report) the player can still get rid of it.
+    static bool dismissed = false;
+    static uint32_t prevButtons = 0;
+    const uint32_t buttons = VirtualRemote::LastButtons();
+    constexpr uint32_t kCloseButtons = 0x1000 | 0x0200;  // WPAD -, 1
+    if (screenUp && shownSince >= 0.0 && ImGui::GetTime() - shownSince > 0.3 && (buttons & ~prevButtons & kCloseButtons) != 0)
+        dismissed = true;
+    prevButtons = buttons;
+    if (!screenUp) dismissed = false;
+    if (style < 0 || style > 2 || !screenUp || dismissed) {
         if (shownSince >= 0.0)  // closed: what it showed (diagnoses a missing callout)
             std::fprintf(stderr, "[controls panel] style %d showed move %d flip %d jump %d pixl %d tippi %d\n", style, seen[2],
                          seen[3], seen[4], seen[5], seen[6]);
@@ -2061,6 +2072,9 @@ void DrawControlsPanel() {
     text("Controls", -360.0f, 176.0f, 26.0f, 0xFFFFFFFFu, 0);
     text(kPadNames[style], 360.0f, 176.0f, 15.0f, 0xA8AEBDFFu, 2);
     list->AddLine(at(-360.0f, 152.0f), at(360.0f, 152.0f), IM_COL32(255, 255, 255, a(30)), 1.5f * view.scale);
+    // How to close it (the game's - or 1, at their default places on each controller).
+    static const char* const kCloseHint[3] = {"View or LB: close", "Create or L1: close", "- or L: close"};
+    text(kCloseHint[style], 360.0f, -196.0f, 15.0f, 0xA8AEBDFFu, 2);
 
     // The controller.
     constexpr float kPadW = 300.0f, kPadCX = -28.0f, kPadCY = -18.0f;
@@ -2072,8 +2086,9 @@ void DrawControlsPanel() {
     // from top to bottom, with a leader line to the button.
     struct Callout { int m; const char* title; const char* sub; };
     static const Callout kLeft[] = {{2, "Move", "Speak, interact"}};
-    static const char* const kShakeButtons[3] = {"RB or RT, after a stomp", "R1 or R2, after a stomp", "R or ZR, after a stomp"};
-    const Callout kRight[] = {{7, "Stylish move", kShakeButtons[style]}, {3, "Flip", ""}, {5, "Use a Pixl", "Cancel"},
+    static const char* const kShakeButtons[3] = {"RB or RT: stylish moves, break free", "R1 or R2: stylish moves, break free",
+                                                 "R or ZR: stylish moves, break free"};
+    const Callout kRight[] = {{7, "Shake", kShakeButtons[style]}, {3, "Flip", ""}, {5, "Use a Pixl", "Cancel"},
                               {4, "Jump", "Confirm"}, {6, "Use Tippi", ""}};
     const auto callouts = [&](const Callout* items, size_t count, bool right) {
         std::vector<const Callout*> shown;
