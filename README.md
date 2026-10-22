@@ -15,7 +15,6 @@ with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the ga
 - Up to 4K, borderless 1080p by default
 - Widescreen: 16:9, fill or cinematic 2.39:1, or the original 4:3
 - Frame interpolation up to 240 fps (120, 180 or 240)
-- Built-in higher-quality music and HD textures (community mods, see Credits)
 - Xbox, PlayStation and Nintendo gamepads plus keyboard, with press-to-bind remapping
 - The Wii Remote pointer (Tippi, the HOME menu) on the right stick or the mouse
 - On-screen buttons match your controller (Xbox, PlayStation or Nintendo), with a controls screen for it
