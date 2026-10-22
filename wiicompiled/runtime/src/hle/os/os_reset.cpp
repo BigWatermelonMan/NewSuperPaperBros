@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "aurora_events.h"
 #include "hle/audio/ax_dsp.h"
 #include "hle_stubs.h"
 #include "ppc_runtime.h"
@@ -133,11 +134,28 @@ extern "C" uint32_t OSResetSystem()
     AxDspHle::ShutdownMixWorker();
     Memory::Reset();
     SetRuntimeExitCode(0);
-    std::exit(EXIT_SUCCESS);
+    // HOME menu "Reset"/"Wii Menu": exit like the window's close button. std::exit ran the engine DLL's static
+    // destructors with threads still joinable and showed a std::terminate error box (issue #40, like #38).
+    ExitForAuroraWindowClose();
     return 0; // unreachable, but keeps the signature consistent with callers
 }
 
 PPC_NATIVE_OVERRIDE(80273B38, OSResetSystem, uint32_t, (), ());
+
+// HOME menu "Reset" (OSRestart), "Wii Menu" (OSReturnToMenu) and power off (OSShutdownSystem), plus the
+// other reboot paths: on a Wii they shut the hardware down and spin until the console resets, so the game
+// hung after "Yes" (issue #40). Here they quit the game like its close button. Names from projects/spm/MAP.txt;
+// the PAL build maps the addresses.
+extern "C" void OSShutdownSystem_HLE() { RT_LOGF(RT_TAG_OS, "OSShutdownSystem: quitting\n"); ExitForAuroraWindowClose(); }
+PPC_NATIVE_OVERRIDE_VOID(80273778, OSShutdownSystem_HLE, (), ());
+extern "C" void OSRebootForNANDAPP_HLE() { RT_LOGF(RT_TAG_OS, "__OSRebootForNANDAPP: quitting\n"); ExitForAuroraWindowClose(); }
+PPC_NATIVE_OVERRIDE_VOID(8027388C, OSRebootForNANDAPP_HLE, (), ());
+extern "C" void OSRestart_HLE() { RT_LOGF(RT_TAG_OS, "OSRestart: quitting\n"); ExitForAuroraWindowClose(); }
+PPC_NATIVE_OVERRIDE_VOID(8027393C, OSRestart_HLE, (), ());
+extern "C" void OSReturnToMenu_HLE() { RT_LOGF(RT_TAG_OS, "OSReturnToMenu: quitting\n"); ExitForAuroraWindowClose(); }
+PPC_NATIVE_OVERRIDE_VOID(802739C8, OSReturnToMenu_HLE, (), ());
+extern "C" void OSReturnToMenuForError_HLE() { RT_LOGF(RT_TAG_OS, "__OSReturnToMenuForError: quitting\n"); ExitForAuroraWindowClose(); }
+PPC_NATIVE_OVERRIDE_VOID(80273A9C, OSReturnToMenuForError_HLE, (), ());
 
 // 0x801B89E0 -> exit(int status)
 extern "C" uint32_t Exit_801AE58C(int status)
@@ -152,6 +170,7 @@ extern "C" uint32_t Exit_801AE58C(int status)
         MarkFatalErrorReported();
     }
     SetRuntimeExitCode(status);
+    if (status == 0) ExitForAuroraWindowClose();
     std::exit(status);
     return static_cast<uint32_t>(status);
 }

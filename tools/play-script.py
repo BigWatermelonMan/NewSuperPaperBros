@@ -26,6 +26,8 @@ out.mkdir(parents=True, exist_ok=False)
 disc = (args.disc or root / 'Disc/DATA').resolve()
 play = sweep.prepare(root, out, root / 'Play/SuperPaperMario.exe', disc)
 (play / 'start_map.txt').write_text(f'{args.map} {args.gsw0}\n' if args.gsw0 >= 0 else f'{args.map}\n')
+if os.environ.get('SPM_PLAY_DRAWDUMP'):  # draw list of that presented frame (vi.cpp reads drawdump.txt)
+    (play / 'drawdump.txt').write_text(os.environ['SPM_PLAY_DRAWDUMP'] + '\n')
 env = os.environ.copy()
 env.pop('SPM_MAP_SWEEP_FILE', None)
 env['NSMBW_INPUT_SCRIPT'] = args.input

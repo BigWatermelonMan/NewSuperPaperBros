@@ -418,7 +418,10 @@ void StartStallWatchdogOnce() {
         }
         std::thread([] {
             const auto start = std::chrono::steady_clock::now();
-            for (const int seconds : {12, 30}) {
+            // SPM_WATCHDOG_AT=<s>: one more thread dump then (e.g. to see where a hang sits)
+            const char* extra = std::getenv("SPM_WATCHDOG_AT");
+            for (const int seconds : {12, 30, extra ? std::atoi(extra) : 0}) {
+                if (seconds == 0) break;
                 std::this_thread::sleep_until(start + std::chrono::seconds(seconds));
                 const uint32_t frames = s_presentedXfbFrames.load(std::memory_order_relaxed);
                 const bool black = g_vi.black;  // racy read; diagnostics only
