@@ -146,6 +146,25 @@ PPC_NATIVE_OVERRIDE(80273B38, OSResetSystem, uint32_t, (), ());
 // other reboot paths: on a Wii they shut the hardware down and spin until the console resets, so the game
 // hung after "Yes" (issue #40). Here they quit the game like its close button. Names from projects/spm/MAP.txt;
 // the PAL build maps the addresses.
+// The PAL game's spsndExit (USA has no such step) unregisters the AI DMA callback and then calls AXQuit, whose
+// __AXOutQuit sleeps until the next audio frame. Here audio frames run from that callback, so none comes and the
+// HOME menu's Reset/Wii Menu froze on a black screen (issue #40). The game quits right after, so skip it.
+// make_pal_runtime.py sets SPM_REGION_PAL to 1 and keeps 802875F0 (PAL AXQuit) as it is.
+#define SPM_REGION_PAL 0
+#if SPM_REGION_PAL
+extern "C" void AXQuit_PAL_HLE() { RT_LOGF(RT_TAG_OS, "AXQuit: skipped at shutdown\n"); }
+PPC_NATIVE_OVERRIDE_VOID(802875F0, AXQuit_PAL_HLE, (), ());
+#endif
+
+// The game's reset callbacks (spmario.c): each sets a flag that spmarioMain acts on. Same effect as the
+// originals (li r0,1; stb r0,flag(r13)), plus a log line so a reset request shows up in the log.
+extern "C" void resetButtonRestart_HLE(CpuContext* ctx) { RT_LOGF(RT_TAG_OS, "resetButtonRestart\n"); ctx->gpr[0] = 1; Memory::Write8(ctx->gpr[13] - 0x7540, 1); }
+PPC_NATIVE_OVERRIDE_VOID(801A82C8, resetButtonRestart_HLE, (CpuContext* ctx), (ctx));
+extern "C" void shutdownConsole_HLE(CpuContext* ctx) { RT_LOGF(RT_TAG_OS, "shutdownConsole\n"); ctx->gpr[0] = 1; Memory::Write8(ctx->gpr[13] - 0x753F, 1); }
+PPC_NATIVE_OVERRIDE_VOID(801A82D4, shutdownConsole_HLE, (CpuContext* ctx), (ctx));
+extern "C" void homeButtonRestart_HLE(CpuContext* ctx) { RT_LOGF(RT_TAG_OS, "homeButtonRestart\n"); ctx->gpr[0] = 1; Memory::Write8(ctx->gpr[13] - 0x753E, 1); }
+PPC_NATIVE_OVERRIDE_VOID(801A82E0, homeButtonRestart_HLE, (CpuContext* ctx), (ctx));
+
 extern "C" void OSShutdownSystem_HLE() { RT_LOGF(RT_TAG_OS, "OSShutdownSystem: quitting\n"); ExitForAuroraWindowClose(); }
 PPC_NATIVE_OVERRIDE_VOID(80273778, OSShutdownSystem_HLE, (), ());
 extern "C" void OSRebootForNANDAPP_HLE() { RT_LOGF(RT_TAG_OS, "__OSRebootForNANDAPP: quitting\n"); ExitForAuroraWindowClose(); }

@@ -72,6 +72,7 @@ def skeleton(read, a):
 # Hand-checked from the MISMATCH rows of remap_log.csv: us -> eu, or None when the PAL dol has no such function
 # (its hook line is then wrapped in #if 0). DCStoreRange (dcbst loop) is dead-stripped from the PAL dol.
 OVERRIDES = {0x8026D830: None,
+             0x802875F0: 0x802875F0,  # PAL-only hook (AXQuit, os_reset.cpp under SPM_REGION_PAL): already a PAL address
              # SDK functions the USA symbol table leaves unnamed (hand-verified in the USA runtime), named in EU0.
              0x802CC950: 0x802CF628, 0x802CE684: 0x802D0E70, 0x802CE4C4: 0x802D0C50}  # WPADInit, WPADControlMotor, WPADGetInfoAsync
 def verify_code(a, b, how):
@@ -93,7 +94,8 @@ LIT = re.compile(r"(?<![0-9A-Za-z_])(0x)([0-9A-Fa-f]{8})(?![0-9A-Fa-f])|(\(\s*)(
 SDA = re.compile(r"(r13 - 0x|Sda1Offset = 0x|OffsetFromR13 = 0x)([0-9A-Fa-f]{4})(u?)")
 TEXT = [('kGameId = "R8PE01"', 'kGameId = "R8PP01"'), ("kRevision = 0;", "kRevision = -1;"),
         ("Super Paper Mario (USA, R8PE01, revision 0)", "Super Paper Mario (Europe, R8PP01)"),
-        ("0x52385045", "0x52385050")]  # game code R8PE -> R8PP (low-memory seeds and the title-id fallbacks)
+        ("0x52385045", "0x52385050"),  # game code R8PE -> R8PP (low-memory seeds and the title-id fallbacks)
+        ("#define SPM_REGION_PAL 0", "#define SPM_REGION_PAL 1")]  # turns on hooks for functions only the PAL dol has
 log, stats = [], Counter()
 if dst.exists():
     shutil.rmtree(dst)
