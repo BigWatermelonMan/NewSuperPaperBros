@@ -198,7 +198,11 @@ aurora::gfx::TextureHandle acquire_copy_texture(const aurora::gx::GXState::CopyT
   const u32 frame = aurora::gfx::current_frame();
   for (auto it = g_copyTexturePool.begin(); it != g_copyTexturePool.end();) {
     if (!(it->key == key)) {
-      if (frame - it->lastUsedFrame > kCopyTextureIdleFrames && it->handle.use_count() <= 1) {
+      // SPM's Fort Francis elevator copies a screen area to one destination with a new height every
+      // frame (608x480..1024): keeping each old size for seconds piled up ~4 GB at 4K and garbled the
+      // screen on cards with less memory. A size not used this frame at the same destination is stale.
+      const bool staleSize = it->key.dest == key.dest && it->lastUsedFrame != frame;
+      if ((staleSize || frame - it->lastUsedFrame > kCopyTextureIdleFrames) && it->handle.use_count() <= 1) {
         it = g_copyTexturePool.erase(it);  // idle for seconds: give the memory back
         continue;
       }

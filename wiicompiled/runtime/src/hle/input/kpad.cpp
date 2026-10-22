@@ -5,6 +5,9 @@
 #include "input_bindings.h"
 #include "memory.h"
 #include "wii_remote_input.h"
+#include "runtime_log.h"
+
+#include <cstdlib>
 
 #include <algorithm>
 #include <array>
@@ -150,6 +153,12 @@ int32_t WriteStatus(uint32_t chan, uint32_t addr, const WiiRemoteInput::KpadSamp
             repeat = true;
             state.repeatLeft += kRepeatPulse;
         }
+    }
+    {   // SPM_LOG_KPAD: every hold/trig change the game is handed (input debugging)
+        static const bool logKpad = std::getenv("SPM_LOG_KPAD") != nullptr;
+        if (logKpad && (hold != state.prevHold || repeat))
+            RT_LOGF(RT_TAG_RUNTIME, "[kpad] ch%u hold %08X trig %08X rpt %d\n", chan, hold | (repeat ? kButtonRpt : 0u),
+                    hold & ~state.prevHold, repeat ? 1 : 0);
     }
     Memory::Write32(addr + kHold, hold | (repeat ? kButtonRpt : 0u));
     Memory::Write32(addr + kTrig, hold & ~state.prevHold);
