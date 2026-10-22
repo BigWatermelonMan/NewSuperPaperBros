@@ -83,6 +83,8 @@ struct ScriptEvent {
     uint32_t bits = 0;
     uint32_t chan = 0;
     std::string text;
+    bool pointAt = false;  // "P<x>_<y>" token: POINT at (x, y) in -1..1 for this event
+    float point[2] = {0.0f, 0.0f};
 };
 
 struct InputScript {
@@ -152,7 +154,14 @@ const InputScript& Script() {
                 size_t b = 0;
                 while (b <= buttons.size()) {
                     const size_t plus = buttons.find('+', b);
-                    event.bits |= ScriptButtonBit(buttons.substr(b, plus == std::string::npos ? std::string::npos : plus - b));
+                    const std::string token = buttons.substr(b, plus == std::string::npos ? std::string::npos : plus - b);
+                    if (token.size() > 1 && token[0] == 'P' && token.find('_') != std::string::npos &&
+                        std::sscanf(token.c_str() + 1, "%f_%f", &event.point[0], &event.point[1]) == 2) {
+                        event.pointAt = true;
+                        event.bits |= kScriptPoint;
+                    } else {
+                        event.bits |= ScriptButtonBit(token);
+                    }
                     if (plus == std::string::npos) break;
                     b = plus + 1;
                 }
@@ -191,7 +200,10 @@ bool ScriptedSample(uint32_t chan, KpadSample& sample) {
                 sample.pointerValid = true;
                 // NSMBW_SCRIPT_POINT="x,y" (-1..1) moves POINT off the centre; it sweeps left-right over time if x is "sweep"
                 static const char* where = std::getenv("NSMBW_SCRIPT_POINT");
-                if (where != nullptr) {
+                if (event.pointAt) {
+                    sample.pointer[0] = event.point[0];
+                    sample.pointer[1] = event.point[1];
+                } else if (where != nullptr) {
                     if (std::strncmp(where, "sweep", 5) == 0) {
                         sample.pointer[0] = static_cast<float>(std::sin(static_cast<double>(now) / 700.0)) * 0.8f;
                         sample.pointer[1] = static_cast<float>(std::cos(static_cast<double>(now) / 1100.0)) * 0.5f;
