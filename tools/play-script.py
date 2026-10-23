@@ -31,6 +31,7 @@ if os.environ.get('SPM_PLAY_DRAWDUMP'):  # draw list of that presented frame (vi
 env = os.environ.copy()
 env.pop('SPM_MAP_SWEEP_FILE', None)
 env['NSMBW_INPUT_SCRIPT'] = args.input
+env.setdefault('AURORA_INTERP_NOCAP', '1')  # SPM_SWEEP_INTERP still interpolates on a 60 Hz test monitor
 shots = sorted(float(s) for s in args.shots.split(',') if s)
 (out / 'shots').mkdir(exist_ok=True)
 with (out / 'run.log').open('wb') as log:

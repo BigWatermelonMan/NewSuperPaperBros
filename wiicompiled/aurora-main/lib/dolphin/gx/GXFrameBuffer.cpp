@@ -495,9 +495,10 @@ void GXCopyTex(void* dest, GXBool clear) {
   auto sourceRect = map_texture_copy_source(g_gxState.texCopySrc, g_gxState.texCopySrcRenderSpace);
   // SPM: with the view widened past 16:9 (Hor+), the game's screen coordinates squeeze toward the centre. A copy
   // of part of the screen (the door-opening effect copies the door) must take the same squeeze to find it;
-  // full-width copies stay full-width, since what they're drawn back with covers the whole screen.
+  // full-width copies stay full-width, since what they're drawn back with covers the whole screen. Near-full ones
+  // too: the Fort Francis elevator's offscreen copy is 608 of 640 wide and was stretched ~12% (issue #41, mobby45).
   if (const float widen = aurora::gx::fifo::g_spmScreenWiden; widen < 1.f && !g_gxState.texCopySrcRenderSpace &&
-      g_gxState.texCopySrc.width < static_cast<int32_t>(aurora::gx::logical_fb_size().x)) {
+      g_gxState.texCopySrc.width < static_cast<int32_t>(aurora::gx::logical_fb_size().x * 0.75f)) {
     const float cx = static_cast<float>(aurora::gfx::get_render_target_size().x) * 0.5f;
     auto& sr = sourceRect.sampleRect;
     sr.x() = cx + (sr.x() - cx) * widen;

@@ -19,6 +19,7 @@
 
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_thread.h>
+#include <SDL3/SDL_video.h>
 #include <magic_enum.hpp>
 
 #include "system_info.hpp"
@@ -2073,6 +2074,22 @@ void aurora_set_vsync(bool enabled) { aurora::webgpu::request_vsync(enabled); }
 bool aurora_get_vsync() { return aurora::webgpu::vsync_enabled(); }
 void aurora_set_frame_interpolation_fps(uint32_t targetFps) {
 #ifdef AURORA_ENABLE_GX
+  // New Super Paper Bros.: frames past the display's refresh are never seen, only paid for (a Steam Deck at 60 Hz
+  // with the 120 FPS default fell to 30, issue #43). Use the highest target the display can show, else none.
+  // AURORA_INTERP_NOCAP: tests that need interpolation on a 60 Hz monitor.
+  if (SDL_Window* window = aurora::window::get_sdl_window();
+      window != nullptr && targetFps > 0 && std::getenv("AURORA_INTERP_NOCAP") == nullptr) {
+    if (const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+        mode != nullptr && mode->refresh_rate > 1.f) {
+      const uint32_t requested = targetFps;
+      const float hz = mode->refresh_rate + 1.f;  // 119.88 Hz counts as 120
+      targetFps = requested >= 240 && hz >= 240.f ? 240 : requested >= 180 && hz >= 180.f ? 180 : hz >= 120.f ? 120 : 0;
+      targetFps = std::min(targetFps, requested);
+      if (targetFps != requested)
+        aurora::Log.info("Frame interpolation {} FPS lowered to {} for a {:.0f} Hz display", requested, targetFps,
+                         mode->refresh_rate);
+    }
+  }
   aurora::gx::set_frame_interpolation_fps(targetFps);
 #else
   (void)targetFps;

@@ -92,8 +92,11 @@ private:
   InterpolationWorkerPool() {
     const unsigned hardware = std::thread::hardware_concurrency();
     // The caller helps too. Cap the helpers: tasks are short memcpy+math, so dispatch
-    // overhead and memory bandwidth dominate past a few threads.
-    const unsigned helpers = hardware > 2 ? std::min(hardware - 1, 6u) : 0;
+    // overhead and memory bandwidth dominate past a few threads. Count cores, not SMT threads
+    // (about half), and leave room for the game and render threads: on a Steam Deck's 4 cores /
+    // 8 threads, 6 helpers shared cores with the game thread and halved the frame rate (issue #43).
+    const unsigned cores = std::max(hardware / 2, 1u);
+    const unsigned helpers = cores > 2 ? std::min(cores - 1, 6u) : 0;
     m_workers.reserve(helpers);
     for (unsigned i = 0; i < helpers; ++i) {
       m_workers.emplace_back([this] { worker_loop(); });

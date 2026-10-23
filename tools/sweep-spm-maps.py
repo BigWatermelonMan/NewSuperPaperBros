@@ -246,6 +246,7 @@ def run(args):
             remaining.write_text('\n'.join(maps[index:]) + '\n', encoding='ascii')
             env = os.environ.copy()
             env['SPM_MAP_SWEEP_FILE'] = str(remaining)
+            env.setdefault('AURORA_INTERP_NOCAP', '1')  # SPM_SWEEP_INTERP interpolates on a 60 Hz test monitor too
             env['SPM_MAP_SWEEP_SECONDS'] = str(args.seconds)
             env['NSMBW_INPUT_SCRIPT'] = os.environ.get('SPM_SWEEP_INPUT') or ','.join(f'{ms}:TWO:100' for ms in range(1000, 85000, 2000)) + ',5000:PLUS:100'
             env.pop('NSMBW_SESSION_SCRIPT', None)
