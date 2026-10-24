@@ -1,4 +1,4 @@
-# New Super Paper Bros.
+# Super Paper Mario Deluxe + The Lost Pages (New Super Paper Bros Fork)
 
 (This section written by me, a human.) FORK - [Super Paper Mario Deluxe + The Lost Pages. This fork will include lots of content on my idea of a proper remaster of SPM. Please be patient!]
 
