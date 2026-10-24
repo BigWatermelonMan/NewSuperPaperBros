@@ -1574,6 +1574,8 @@ int RuntimeMain(int argc, char** argv) {
 #endif
 
 
+        // Lost Pages: shaders are generated per pixel or per vertex from the first pipeline on.
+        aurora_set_per_pixel_lighting(RuntimeConfigFile::PerPixelLighting(true));
         const AuroraInfo auroraInfo = aurora_initialize(0, nullptr, &auroraConfig);
         if (auroraInfo.initializationStatus != AURORA_INITIALIZATION_SUCCESS) {
             throw std::runtime_error(auroraInfo.initializationError != nullptr

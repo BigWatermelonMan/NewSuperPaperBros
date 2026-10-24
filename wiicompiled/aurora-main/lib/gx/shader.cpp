@@ -847,7 +847,7 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8 
           var dist_attn = dot(light.dist_att, vec3f(1.0, dist, dist2));
           attn = max(0.0, cos_attn / dist_attn);)""");
   } else if (cc.attnFn == GX_AF_SPEC) {
-    std::string_view normal = UsePerPixelLighting ? "in.mv_nrm"sv : "mv_nrm"sv;
+    std::string_view normal = UsePerPixelLighting ? "ppl_nrm"sv : "mv_nrm"sv;
     std::string dist_attn = diffFn != GX_DF_NONE
                                 ? "dot(normalize(light.dist_att), vec3f(1.0, attn, attn * attn))"
                                 : "dot(light.dist_att, vec3f(1.0, attn, attn * attn))";
@@ -858,7 +858,7 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8 
           attn = select(select(0.0, 1.0, cos_attn > 0.0), max(0.0, cos_attn / dist_attn), dist_attn != 0.0);)""",
                               normal, dist_attn);
   }
-  std::string_view normal = UsePerPixelLighting ? "in.mv_nrm"sv : "mv_nrm"sv;
+  std::string_view normal = UsePerPixelLighting ? "ppl_nrm"sv : "mv_nrm"sv;
   std::string lightDirSetup;
   if (cc.attnFn == GX_AF_NONE) {
     lightDirSetup = fmt::format(R"""(
@@ -880,13 +880,13 @@ auto lighting_func(const ShaderConfig& config, const ColorChannelConfig& cc, u8 
     lightDiffFn = "1.0"sv;
   } else if (diffFn == GX_DF_SIGN) {
     if (UsePerPixelLighting) {
-      lightDiffFn = "dot(ldir, in.mv_nrm)"sv;
+      lightDiffFn = "dot(ldir, ppl_nrm)"sv;
     } else {
       lightDiffFn = "dot(ldir, mv_nrm)"sv;
     }
   } else if (diffFn == GX_DF_CLAMP) {
     if (UsePerPixelLighting) {
-      lightDiffFn = "max(0.0, dot(ldir, in.mv_nrm))"sv;
+      lightDiffFn = "max(0.0, dot(ldir, ppl_nrm))"sv;
     } else {
       lightDiffFn = "max(0.0, dot(ldir, mv_nrm))"sv;
     }
@@ -1187,6 +1187,8 @@ wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept {
       vtxXfrAttrs += fmt::format(FMT_STRING(R"""(
     out.mv_pos = mv_pos;
     out.mv_nrm = mv_nrm;)"""));
+      // Interpolated normals are shorter than unit length between vertices.
+      fragmentFnPre += "\n    let ppl_nrm = select(vec3f(0.0), normalize(in.mv_nrm), dot(in.mv_nrm, in.mv_nrm) > 1e-12);";
     }
   }
 

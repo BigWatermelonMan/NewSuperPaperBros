@@ -7,6 +7,10 @@ extern "C" int g_spmSweepDump;
 #include "ppc_runtime.h"
 #include "runtime_log.h"
 
+#include <aurora/gfx.h>
+
+#include "lost_pages/lp_testarea.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -431,7 +435,27 @@ struct Sweep {
 };
 } // namespace
 
+// Lost Pages sun rays: rooms SPM sets indoors (towers, mansions, caves, castles, space, the Pit) never get
+// them, whatever the sky measurement says; their backdrops often look like open sky to the renderer.
+static float OutdoorHint(const std::string& map) {
+    static constexpr const char* kIndoor[] = {"mac", "dos", "dan", "bos", "mg", "ls", "sp", "mi2", "mi3", "mi4",
+                                              "he4", "ta4", "gn3", "gn4"};
+    for (const char* prefix : kIndoor) {
+        if (map.rfind(prefix, 0) == 0) return 0.0f;
+    }
+    return 1.0f;
+}
+
 void Tick(CpuContext* cpu, uint32_t presentedFrames) {
+    if (cpu) LostPages::TestAreaTitleTick(cpu);
+    if (presentedFrames % 15 == 0) {
+        static std::string lastMap;
+        const std::string map = Sweep::CurrentMap();
+        if (map != lastMap) {
+            lastMap = map;
+            aurora_set_scene_fx_outdoor(OutdoorHint(map));
+        }
+    }
     // SPM_MARIO_LOG=1: Mario's position / speed / motion / buttons every 15 frames in a map (spm-headers MarioWork).
     static const bool marioLog = std::getenv("SPM_MARIO_LOG") != nullptr;
     uint32_t seq = 0;

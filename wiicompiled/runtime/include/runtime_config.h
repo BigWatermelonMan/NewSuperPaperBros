@@ -55,6 +55,16 @@ struct RuntimeUserConfig {
     std::optional<bool> frameGraph;     // NSMBW: [video] frame_graph, frame times under the FPS counter
     std::optional<bool> vsync;          // NSMBW: [video] vsync, presents wait for the display (Windows)
     std::optional<uint32_t> disabledPostProcessingPaths;
+    // Lost Pages: [video] scene_fx (enhanced lighting on/off), fx_* amounts 0..1, per_pixel_lighting.
+    std::optional<bool> sceneFx;
+    std::optional<float> fxAmbientOcclusion;
+    std::optional<float> fxShadows;
+    std::optional<float> fxReflections;
+    std::optional<float> fxBloom;
+    std::optional<float> fxLighting;
+    std::optional<float> fxSunRays;
+    std::optional<bool> perPixelLighting;
+    std::optional<bool> turnBasedBattles;  // Lost Pages: [game] turn_based_battles
     std::optional<float> audioVolume;
     std::optional<float> audioMusicVolume;
     std::optional<float> audioSoundEffectsVolume;
@@ -542,6 +552,7 @@ inline RuntimeUserConfig ParseConfigDocument(const toml::value& document) {
     }
 
     config.language = FindConfigValue<std::string>(document, "game", "language");
+    config.turnBasedBattles = FindConfigValue<bool>(document, "game", "turn_based_battles");
     config.widescreen = FindConfigValue<bool>(document, "video", "widescreen");
     config.forceAspect169 = FindConfigValue<bool>(document, "video", "force_16_9");
     if (auto value = FindConfigInt(document, "video", "aspect_mode"); value && *value >= 0 && *value <= 3) {
@@ -590,6 +601,18 @@ inline RuntimeUserConfig ParseConfigDocument(const toml::value& document) {
     config.vsync = FindConfigValue<bool>(document, "video", "vsync");
     config.textureReplacements = FindConfigValue<bool>(document, "video", "texture_replacements");
     config.textureDumps = FindConfigValue<bool>(document, "video", "texture_dumps");
+    config.sceneFx = FindConfigValue<bool>(document, "video", "scene_fx");
+    config.perPixelLighting = FindConfigValue<bool>(document, "video", "per_pixel_lighting");
+    auto readAmount = [&](std::string_view key) -> std::optional<float> {
+        auto value = FindConfigFloat(document, "video", key);
+        return value && *value >= 0.0f && *value <= 1.0f ? value : std::nullopt;
+    };
+    config.fxAmbientOcclusion = readAmount("fx_ambient_occlusion");
+    config.fxShadows = readAmount("fx_shadows");
+    config.fxReflections = readAmount("fx_reflections");
+    config.fxBloom = readAmount("fx_bloom");
+    config.fxLighting = readAmount("fx_lighting");
+    config.fxSunRays = readAmount("fx_sun_rays");
     if (auto value = FindConfigUint(document, "video", "disabled_post_processing_paths");
         value && (*value & ~0x10u) == 0) {
         config.disabledPostProcessingPaths = *value & 0x10u;
@@ -811,6 +834,37 @@ inline bool SetDisplayMode(std::string value) {
 inline bool SetSkipUnreadyPipelines(bool value) {
     Mutable().skipUnreadyPipelines = value;
     return WriteSetting("video", "skip_unready_pipelines", value ? "true" : "false");
+}
+
+inline bool SetTurnBasedBattles(bool value) {
+    Mutable().turnBasedBattles = value;
+    return WriteSetting("game", "turn_based_battles", value ? "true" : "false");
+}
+
+inline bool SetSceneFx(bool value) {
+    Mutable().sceneFx = value;
+    return WriteSetting("video", "scene_fx", value ? "true" : "false");
+}
+
+inline bool SetPerPixelLighting(bool value) {
+    Mutable().perPixelLighting = value;
+    return WriteSetting("video", "per_pixel_lighting", value ? "true" : "false");
+}
+
+// Lost Pages scene effect amounts, keyed by their [video] name (fx_ambient_occlusion, fx_shadows, ...).
+inline bool SetSceneFxAmount(std::string_view key, float value) {
+    value = std::clamp(value, 0.0f, 1.0f);
+    auto& config = Mutable();
+    if (key == "fx_ambient_occlusion") config.fxAmbientOcclusion = value;
+    else if (key == "fx_shadows") config.fxShadows = value;
+    else if (key == "fx_reflections") config.fxReflections = value;
+    else if (key == "fx_bloom") config.fxBloom = value;
+    else if (key == "fx_lighting") config.fxLighting = value;
+    else if (key == "fx_sun_rays") config.fxSunRays = value;
+    else return false;
+    std::ostringstream formatted;
+    formatted << value;
+    return WriteSetting("video", key, formatted.str());
 }
 
 inline bool SetDisableCopyFilter(bool value) {
@@ -1133,6 +1187,25 @@ inline uint32_t FrameInterpolationFps(uint32_t fallback = 0) {
 inline bool SkipUnreadyPipelines(bool fallback = true) {
     return Get().skipUnreadyPipelines.value_or(fallback);
 }
+
+inline bool TurnBasedBattles(bool fallback = true) {
+    return Get().turnBasedBattles.value_or(fallback);
+}
+
+inline bool SceneFx(bool fallback = true) {
+    return Get().sceneFx.value_or(fallback);
+}
+
+inline bool PerPixelLighting(bool fallback = true) {
+    return Get().perPixelLighting.value_or(fallback);
+}
+
+inline float FxAmbientOcclusion(float fallback) { return Get().fxAmbientOcclusion.value_or(fallback); }
+inline float FxShadows(float fallback) { return Get().fxShadows.value_or(fallback); }
+inline float FxReflections(float fallback) { return Get().fxReflections.value_or(fallback); }
+inline float FxBloom(float fallback) { return Get().fxBloom.value_or(fallback); }
+inline float FxLighting(float fallback) { return Get().fxLighting.value_or(fallback); }
+inline float FxSunRays(float fallback) { return Get().fxSunRays.value_or(fallback); }
 
 inline bool DisableCopyFilter(bool fallback = true) {
     return Get().disableCopyFilter.value_or(fallback);

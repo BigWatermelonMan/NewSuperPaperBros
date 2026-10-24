@@ -18,6 +18,8 @@ extern "C" uint8_t* aurora_load_png_rgba(const char* path, uint32_t* width, uint
 #include "music_attenuation.h"
 #include "runtime_config.h"
 #include "display_settings.h"
+#include "lost_pages/lp_battle.h"
+#include "lost_pages/lp_testarea.h"
 #include <dolphin/gx/GXAurora.h>
 #include "runtime_log.h"
 #include "memory.h"
@@ -125,6 +127,17 @@ int g_displayMode = [] {
 }();
 bool g_skipUnreadyPipelines = RuntimeConfigFile::SkipUnreadyPipelines(true);
 bool g_disableCopyFilter = RuntimeConfigFile::DisableCopyFilter(true);
+// Lost Pages enhanced lighting (aurora scene effects); defaults match aurora's scene_fx::Settings.
+AuroraSceneFx g_sceneFx{
+    RuntimeConfigFile::SceneFx(true),
+    RuntimeConfigFile::FxAmbientOcclusion(0.85f),
+    RuntimeConfigFile::FxShadows(0.9f),
+    RuntimeConfigFile::FxReflections(0.7f),
+    RuntimeConfigFile::FxBloom(0.0f),
+    RuntimeConfigFile::FxLighting(0.7f),
+    RuntimeConfigFile::FxSunRays(0.8f),
+};
+bool g_perPixelLighting = RuntimeConfigFile::PerPixelLighting(true);
 bool g_showFps = RuntimeConfigFile::ShowFps(false);  // off unless turned on
 bool g_frameGraph = RuntimeConfigFile::FrameGraph(false);
 std::atomic<bool> g_vsync{RuntimeConfigFile::VSync(true)};  // default on: no tearing
@@ -1236,6 +1249,49 @@ void DrawGraphicsSettings() {
     if (ImGui::Checkbox("Show FPS", &g_showFps)) {
         RuntimeConfigFile::SetShowFps(g_showFps);
     }
+    ImGui::SeparatorText("Lost Pages");
+    if (LostPages::TestAreaActive()) {
+        ImGui::BeginDisabled(LostPages::BattleUiSnapshot().active);
+        if (ImGui::Button("Reset test area and enemies")) LostPages::RequestTestArea();
+        ImGui::EndDisabled();
+    }
+    if (bool battles = RuntimeConfigFile::TurnBasedBattles(true);
+        ImGui::Checkbox("Turn-based battles (touching an enemy starts a battle)", &battles)) {
+        RuntimeConfigFile::SetTurnBasedBattles(battles);
+    }
+    ImGui::SeparatorText("Enhanced lighting");
+    if (ImGui::Checkbox("Enhanced lighting, shadows and reflections", &g_sceneFx.enabled)) {
+        aurora_set_scene_fx(&g_sceneFx);
+        RuntimeConfigFile::SetSceneFx(g_sceneFx.enabled);
+    }
+    ImGui::BeginDisabled(!g_sceneFx.enabled);
+    struct FxAmount {
+        const char* label;
+        const char* key;
+        float* value;
+    };
+    const std::array<FxAmount, 6> fxAmounts{{
+        {"Ambient occlusion", "fx_ambient_occlusion", &g_sceneFx.ambientOcclusion},
+        {"Paper diorama shadows", "fx_shadows", &g_sceneFx.shadows},
+        {"Glossy floors", "fx_reflections", &g_sceneFx.reflections},
+        {"Key lighting", "fx_lighting", &g_sceneFx.lighting},
+        {"Sun rays (outdoors)", "fx_sun_rays", &g_sceneFx.sunRays},
+        {"Bloom", "fx_bloom", &g_sceneFx.bloom},
+    }};
+    for (const auto& amount : fxAmounts) {
+        int percent = static_cast<int>(*amount.value * 100.0f + 0.5f);
+        if (ImGui::SliderInt(amount.label, &percent, 0, 100, percent == 0 ? "Off" : "%d%%")) {
+            *amount.value = static_cast<float>(percent) / 100.0f;
+            aurora_set_scene_fx(&g_sceneFx);
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            RuntimeConfigFile::SetSceneFxAmount(amount.key, *amount.value);
+        }
+    }
+    ImGui::EndDisabled();
+    if (ImGui::Checkbox("Per-pixel lighting (restart to apply)", &g_perPixelLighting)) {
+        RuntimeConfigFile::SetPerPixelLighting(g_perPixelLighting);
+    }
     ImGui::Separator();
     ImGui::Text("Graphics API: %s", GraphicsApiDisplayName());
 }
@@ -1832,6 +1888,7 @@ void InitializeRuntimeSettings() noexcept {
     aurora_set_display_mode(static_cast<AuroraDisplayMode>(g_displayMode));
     g_displayMode = static_cast<int>(aurora_get_display_mode());
     aurora_set_disable_copy_filter(g_disableCopyFilter);
+    aurora_set_scene_fx(&g_sceneFx);
     aurora_set_skip_unready_pipelines(g_skipUnreadyPipelines);
     g_strapInputAccepted.store(false, std::memory_order_relaxed);
     g_startupDismissFrame.store(UINT64_MAX, std::memory_order_relaxed);
@@ -1869,7 +1926,12 @@ void HandleEvents(const AuroraEvent* events) noexcept {
             g_displayMode = static_cast<int>(aurora_get_display_mode());
             RuntimeConfigFile::SetDisplayMode(std::string(kDisplayModeConfigNames[static_cast<size_t>(g_displayMode)]));
         }
-        if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F10)) {
+        // Lost Pages: on the title screen F10 opens the test area instead of the settings bar.
+        uint32_t seqNow = 0;
+        const bool onTitle = Memory::TryRead32(0x8056D0D8u, seqNow) && seqNow == 1u;
+        if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F10) && onTitle && !g_topBarVisible) {
+            LostPages::RequestTestArea();
+        } else if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F10)) {
             SetTopBarVisible(!g_topBarVisible);
             ApplyInputBlockState();
         }
@@ -2196,6 +2258,9 @@ void Draw() noexcept {
         DrawShaderCompilationStatus();
     }
     NetplayUi::Draw();
+    if (!StartupScreenVisible()) {
+        LostPages::DrawBattleUi();
+    }
     DrawFpsOverlay();
     DrawTopBar();
     DrawExitPrompt();

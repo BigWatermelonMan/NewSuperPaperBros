@@ -41,6 +41,8 @@ void remove_legacy_ini_file(const char* basePath) noexcept {
   std::filesystem::remove(fs_path_from_string(basePath) / "imgui.ini", ec);
 }
 
+static ImFont* g_displayFont = nullptr;
+
 void create_context() noexcept {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -53,6 +55,22 @@ void create_context() noexcept {
   io.LogFilename = g_imguiLog.c_str();
   ImGui::LoadIniSettingsFromMemory("", 0);
   io.WantSaveIniSettings = false;
+  // The default font stays the default; a bold display face (Lost Pages battle text) rides along if the
+  // system has one.
+  io.Fonts->AddFontDefault();
+  static constexpr const char* kDisplayFonts[] = {
+      "C:/Windows/Fonts/seguibl.ttf", "C:/Windows/Fonts/ariblk.ttf", "C:/Windows/Fonts/arialbd.ttf",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"};
+  for (const char* path : kDisplayFonts) {
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec)) {
+      continue;
+    }
+    g_displayFont = io.Fonts->AddFontFromFileTTF(path, 44.0f);
+    if (g_displayFont != nullptr) {
+      break;
+    }
+  }
 }
 
 void initialize() noexcept {
@@ -256,7 +274,10 @@ ImTextureID add_texture(uint32_t width, uint32_t height, const uint8_t* data) no
   g_wgpuTextures.push_back(texture);
   return reinterpret_cast<ImTextureID>(textureView.MoveToCHandle());
 }
+ImFont* display_font() noexcept { return g_displayFont; }
 } // namespace aurora::imgui
+
+ImFont* aurora_imgui_display_font() { return aurora::imgui::display_font(); }
 
 // C bindings
 extern "C" {

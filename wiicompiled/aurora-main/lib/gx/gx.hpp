@@ -48,7 +48,9 @@ constexpr float GX_LARGE_NUMBER = -1048576.0f;
 #endif
 
 namespace aurora::gx {
-constexpr bool UsePerPixelLighting = false;
+// Lost Pages: GX lighting evaluated per pixel instead of per vertex. Set once at startup
+// (aurora_set_per_pixel_lighting) before any shader is generated.
+inline bool UsePerPixelLighting = true;
 constexpr bool UseReversedZ = true;
 
 constexpr u32 MaxTextures = GX_MAX_TEXMAP;

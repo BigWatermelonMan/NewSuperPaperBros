@@ -85,6 +85,31 @@ uint32_t aurora_get_queued_pipeline_count();
 void aurora_set_disable_copy_filter(bool disabled);
 bool aurora_get_disable_copy_filter();
 
+// Lost Pages enhanced lighting, applied to the 3D scene before the HUD. Amounts are 0..1 (0 = off).
+typedef struct AuroraSceneFx {
+  bool enabled;
+  float ambientOcclusion;
+  float shadows;
+  float reflections;
+  float bloom;
+  float lighting;
+  float sunRays;
+} AuroraSceneFx;
+void aurora_set_scene_fx(const AuroraSceneFx* fx);
+void aurora_get_scene_fx(AuroraSceneFx* fx);
+// The game's own idea of whether the current room is outdoors (0..1); sun rays need both it and open sky.
+void aurora_set_scene_fx_outdoor(float outdoor);
+// The game picture inside the window, as fractions of the window size (letterboxing, pillarboxing).
+void aurora_get_present_rect(float* x, float* y, float* width, float* height);
+// Lost Pages battle stage / test room (see scene_fx::Stage): mode 0 off, 1 capture the surroundings this frame,
+// 2 pop-up diorama, 3 test room. floorV is the walking line in screen UV; originU (x of world x = 0) and
+// unitU/unitV (screen units per world unit) are in the game's 608x480 screen space.
+// Lost Pages battle stage: mode 0 off, 2 battle diorama, 3 test room; preset: the area's diorama (0 the test room).
+void aurora_set_scene_fx_stage(int mode, float floorV, float originU, float unitU, float unitV, int preset);
+// GX lighting per pixel instead of per vertex. Only takes effect before the first frame.
+void aurora_set_per_pixel_lighting(bool enabled);
+bool aurora_get_per_pixel_lighting();
+
 // Guest-RAM write tracking. `generation` changes whenever guest RAM covering a host range was
 // written (or returns AURORA_GUEST_WRITE_UNTRACKED); `notify` reports writes aurora made itself.
 #define AURORA_GUEST_WRITE_UNTRACKED UINT64_MAX

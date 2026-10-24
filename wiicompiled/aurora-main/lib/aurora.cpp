@@ -3,6 +3,7 @@
 #ifdef AURORA_ENABLE_GX
 #include "gfx/common.hpp"
 #include "gfx/efb_ram_copy.hpp"
+#include "gfx/scene_fx.hpp"
 #include "gfx/texture_replacement.hpp"
 #include "gx/gx.hpp"
 #include "gx/fifo.hpp"
@@ -1347,6 +1348,9 @@ wgpu::BindGroup upscale_presentation(wgpu::CommandEncoder& encoder,
 
 // `presentSource` is latched in the seal prologue: by the time this encodes, the producer's next
 // gfx::begin_frame() may already have cleared the display-copy override.
+// Where the game picture lands in the window (fractions), for overlays that follow it.
+std::atomic<float> g_presentRect[4] = {0.f, 0.f, 1.f, 1.f};
+
 wgpu::BindGroup encode_presentation_snapshot(wgpu::CommandEncoder& encoder,
                                               const webgpu::PresentSource& presentSource,
                                               const PresentationImage& image,
@@ -1360,6 +1364,13 @@ wgpu::BindGroup encode_presentation_snapshot(wgpu::CommandEncoder& encoder,
   if (window::get_present_aspect_ratio(presentAspect)) {
     viewport = webgpu::calculate_present_viewport_for_aspect(
         image.texture.size.width, image.texture.size.height, presentAspect);
+  }
+  if (image.texture.size.width > 0 && image.texture.size.height > 0) {
+    const float w = static_cast<float>(image.texture.size.width), h = static_cast<float>(image.texture.size.height);
+    g_presentRect[0] = viewport.left / w;
+    g_presentRect[1] = viewport.top / h;
+    g_presentRect[2] = viewport.width / w;
+    g_presentRect[3] = viewport.height / h;
   }
   wgpu::BindGroup presentBindGroup = presentSource.bindGroup;
   wgpu::BindGroup newMetalFXOutput;
@@ -2212,6 +2223,39 @@ void aurora_set_log_level(AuroraLogLevel level) { aurora::g_config.logLevel = le
 void aurora_set_pause_on_focus_lost(bool value) { aurora::g_config.pauseOnFocusLost = value; }
 void aurora_set_disable_copy_filter(bool disabled) { aurora::g_config.disableCopyFilter = disabled; }
 bool aurora_get_disable_copy_filter() { return aurora::g_config.disableCopyFilter; }
+void aurora_set_scene_fx(const AuroraSceneFx* fx) {
+  if (fx == nullptr) {
+    return;
+  }
+  aurora::gfx::scene_fx::set_settings({
+      .enabled = fx->enabled,
+      .ambientOcclusion = fx->ambientOcclusion,
+      .shadows = fx->shadows,
+      .reflections = fx->reflections,
+      .bloom = fx->bloom,
+      .lighting = fx->lighting,
+      .sunRays = fx->sunRays,
+  });
+}
+void aurora_get_scene_fx(AuroraSceneFx* fx) {
+  if (fx == nullptr) {
+    return;
+  }
+  const auto s = aurora::gfx::scene_fx::get_settings();
+  *fx = AuroraSceneFx{s.enabled, s.ambientOcclusion, s.shadows, s.reflections, s.bloom, s.lighting, s.sunRays};
+}
+void aurora_get_present_rect(float* x, float* y, float* width, float* height) {
+  *x = aurora::g_presentRect[0];
+  *y = aurora::g_presentRect[1];
+  *width = aurora::g_presentRect[2];
+  *height = aurora::g_presentRect[3];
+}
+void aurora_set_scene_fx_outdoor(float outdoor) { aurora::gfx::scene_fx::set_outdoor_hint(outdoor); }
+void aurora_set_scene_fx_stage(int mode, float floorV, float originU, float unitU, float unitV, int preset) {
+  aurora::gfx::scene_fx::set_stage({mode, floorV, originU, unitU, unitV, preset});
+}
+void aurora_set_per_pixel_lighting(bool enabled) { aurora::gx::UsePerPixelLighting = enabled; }
+bool aurora_get_per_pixel_lighting() { return aurora::gx::UsePerPixelLighting; }
 void aurora_set_background_input(bool value) {
   aurora::g_config.allowJoystickBackgroundEvents = value;
   aurora::window::set_background_input(value);

@@ -9,6 +9,7 @@
 #include "../webgpu/gpu.hpp"
 #include "../gx/pipeline.hpp"
 #include "pipeline_cache.hpp"
+#include "scene_fx.hpp"
 #include "tex_copy_conv.hpp"
 #include "tex_palette_conv.hpp"
 #include "texture_replacement.hpp"
@@ -199,6 +200,8 @@ struct RenderPass {
     uint32_t x = 0, y = 0, width = 0, height = 0;
   };
   std::vector<Patch> patches;
+  // Lost Pages: run the scene effects on the EFB before this pass (the 3D scene ended here).
+  std::optional<scene_fx::Uniform> sceneFx;
 };
 static std::vector<RenderPass> g_renderPasses;
 static u32 g_currentRenderPass = UINT32_MAX;
@@ -313,6 +316,20 @@ void ensure_staging_space(const StagingSizes& demand) {
   if (!staging_has_space(demand))
     throw StagingCapacityError("GPU operation still exceeds staging capacity after submission");
 }
+
+// Lost Pages scene effects: the frame's world cameras (projection + viewport of its depth-writing
+// draws, the busiest one is the scene's) and whether the effects pass was already inserted.
+// Recording thread only.
+struct SceneFxCamera {
+  Mat4x4<float> proj{};
+  Viewport viewport{};
+  bool ortho = false;
+  uint32_t draws = 0;
+};
+static std::array<SceneFxCamera, 4> g_sceneFxCameras{};
+static uint32_t g_sceneFxCameraCount = 0;
+static uint32_t g_sceneFxSceneDraws = 0;
+static bool g_sceneFxInserted = false;
 
 static void discard_suspended_efb_pass() noexcept {
   if (g_suspendedEfbPass) {
@@ -740,6 +757,134 @@ void resolve_pass(TextureHandle texture, ClipRect rect, bool clearColor, bool cl
   push_command(CommandType::SetScissor, Command::Data{.setScissor = g_cachedScissor});
 }
 
+static bool scene_fx_on_main_efb() noexcept {
+  return !g_inOffscreen && has_current_render_pass() &&
+         g_renderPasses[g_currentRenderPass].colorView.Get() == webgpu::g_frameBuffer.view.Get() &&
+         g_renderPasses[g_currentRenderPass].msaaSamples == 1;
+}
+
+static SceneFxCamera* scene_fx_find_camera(const Mat4x4<float>& proj) noexcept {
+  for (uint32_t i = 0; i < g_sceneFxCameraCount; ++i) {
+    if (std::memcmp(&g_sceneFxCameras[i].proj, &proj, sizeof(proj)) == 0) {
+      return &g_sceneFxCameras[i];
+    }
+  }
+  return nullptr;
+}
+
+void scene_fx_note_scene_draw(const Mat4x4<float>& proj, bool ortho, const Viewport& viewport) noexcept {
+  if (g_sceneFxInserted || !scene_fx::active() || !scene_fx_on_main_efb()) {
+    return;
+  }
+  ++g_sceneFxSceneDraws;
+  SceneFxCamera* camera = scene_fx_find_camera(proj);
+  if (camera == nullptr) {
+    if (g_sceneFxCameraCount == g_sceneFxCameras.size()) {
+      return;
+    }
+    camera = &g_sceneFxCameras[g_sceneFxCameraCount++];
+    *camera = SceneFxCamera{.proj = proj, .ortho = ortho};
+  }
+  // The same camera draws layers with narrower depth ranges (SPM foregrounds); keep the widest.
+  if (camera->draws == 0 || viewport.zfar - viewport.znear > camera->viewport.zfar - camera->viewport.znear) {
+    camera->viewport = viewport;
+  }
+  ++camera->draws;
+}
+
+static bool scene_fx_insert() noexcept;
+
+void scene_fx_copy_clear_boundary() noexcept {
+  // Isolated door/object bakes share the EFB with the later world draw. A HUD-like camera in such a bake
+  // can consume the frame's lighting pass; its copy-clear ends that scene, so don't carry it into the world.
+  if (g_sceneFxSceneDraws < 128) {
+    g_sceneFxSceneDraws = 0;
+    g_sceneFxCameraCount = 0;
+    g_sceneFxInserted = false;
+  }
+}
+
+void scene_fx_prepare_texture_copy() noexcept {
+  static const bool logCopies = std::getenv("SPM_TRANSITION_LOG") != nullptr;
+  if (logCopies) {
+    static uint32_t logged = 0;
+    if (logged++ < 100) {
+      std::fprintf(stderr, "[transition] copy after %u scene draws, cameras %u, fx %d\n",
+                   g_sceneFxSceneDraws, g_sceneFxCameraCount, g_sceneFxInserted ? 1 : 0);
+    }
+  }
+  // A complete world can be captured before the HUD is drawn (doors, flip and other paper transitions).
+  // Bake its lighting before the copy and before any following copy-clear erases the scene depth.
+  // Small isolated object bakes don't constitute a finished world.
+  if (!g_sceneFxInserted && g_sceneFxSceneDraws >= 128 && g_sceneFxCameraCount > 0 &&
+      scene_fx::active() && scene_fx_on_main_efb()) {
+    scene_fx_insert();
+  }
+}
+
+bool scene_fx_try_split(const Mat4x4<float>& proj) noexcept {
+  // HUD and menus come after the world on a camera of their own; draws on a world camera that skip
+  // the depth test (backdrops, effects) are still the scene. With the map hidden (battle stage, test room)
+  // only the actors are left, so a single depth-writing draw is enough.
+  const uint32_t minDraws = scene_fx::stage_mode() != 0 ? 1u : 16u;
+  if (g_sceneFxInserted || g_sceneFxSceneDraws < minDraws || scene_fx_find_camera(proj) != nullptr ||
+      !scene_fx::active() || !scene_fx_on_main_efb()) {
+    return false;
+  }
+  return scene_fx_insert();
+}
+
+// Battle stage / test room frames must get the pass even when no HUD follows the world: insert it at the end.
+static void scene_fx_finish_frame() noexcept {
+  if (scene_fx::stage_mode() != 0 && !g_sceneFxInserted && g_sceneFxSceneDraws >= 1 && g_sceneFxCameraCount > 0 &&
+      scene_fx_on_main_efb()) {
+    scene_fx_insert();
+  }
+}
+
+static bool scene_fx_insert() noexcept {
+  g_sceneFxInserted = true;
+  const SceneFxCamera* scene = &g_sceneFxCameras[0];
+  for (uint32_t i = 1; i < g_sceneFxCameraCount; ++i) {
+    if (g_sceneFxCameras[i].draws > scene->draws) {
+      scene = &g_sceneFxCameras[i];
+    }
+  }
+  auto& prevPass = g_renderPasses[g_currentRenderPass];
+  static const bool debugLog = std::getenv("SPM_SCENE_FX_DEBUG") != nullptr;
+  if (debugLog) {
+    static uint32_t splits = 0;
+    if (splits++ % 300 == 0) {
+      std::fprintf(stderr, "[scenefx] split after %u scene draws on %u cameras (%s, %u draws), pass %u\n",
+                   g_sceneFxSceneDraws, g_sceneFxCameraCount, scene->ortho ? "ortho" : "perspective", scene->draws,
+                   g_currentRenderPass);
+    }
+  }
+  scene_fx::Uniform uniform;
+  if (!scene_fx::make_uniform(uniform, scene->proj, scene->ortho, scene->viewport, prevPass.targetSize)) {
+    return false;
+  }
+  RenderPass newPass{
+      .colorView = prevPass.colorView,
+      .resolveView = prevPass.resolveView,
+      .depthView = prevPass.depthView,
+      .copySourceTexture = prevPass.copySourceTexture,
+      .copySourceView = prevPass.copySourceView,
+      .copySourceDepthView = prevPass.copySourceDepthView,
+      .targetSize = prevPass.targetSize,
+      .msaaSamples = prevPass.msaaSamples,
+      .clearColor = false,
+      .clearDepth = false,
+      .requireReadyPipelines = prevPass.requireReadyPipelines,
+  };
+  newPass.sceneFx = uniform;
+  push_render_pass(std::move(newPass));
+  ++g_currentRenderPass;
+  push_command(CommandType::SetViewport, Command::Data{.setViewport = g_cachedViewport});
+  push_command(CommandType::SetScissor, Command::Data{.setScissor = g_cachedScissor});
+  return true;
+}
+
 void queue_palette_conv(tex_palette_conv::ConvRequest req) {
   if (!has_current_render_pass()) {
     Log.warn("Dropping palette conversion without an active render pass");
@@ -909,6 +1054,7 @@ void initialize() {
   g_frameIndex = 0;
   depth_peek::initialize();
   tex_copy_conv::initialize();
+  scene_fx::initialize();
   tex_palette_conv::initialize();
   texture_replacement::initialize();
 
@@ -1034,6 +1180,7 @@ void shutdown() {
   efb_ram::shutdown();
   depth_peek::shutdown();
   tex_copy_conv::shutdown();
+  scene_fx::shutdown();
   tex_palette_conv::shutdown();
   texture_replacement::shutdown();
   gx::shutdown();
@@ -1138,6 +1285,15 @@ static bool begin_frame_impl(bool clearEfb, bool capacityResume = false) {
   g_mergedDrawCallCount = 0;
   if (clearEfb) {
     gx::begin_frame_interpolation();
+    static const bool debugLog = std::getenv("SPM_SCENE_FX_DEBUG") != nullptr;
+    static uint32_t frames = 0;
+    if (debugLog && frames++ % 120 == 0) {
+      std::fprintf(stderr, "[scenefx] frame: scene draws %u, cameras %u, inserted %d\n", g_sceneFxSceneDraws,
+                   g_sceneFxCameraCount, g_sceneFxInserted ? 1 : 0);
+    }
+    g_sceneFxSceneDraws = 0;
+    g_sceneFxCameraCount = 0;
+    g_sceneFxInserted = false;
   }
   discard_suspended_efb_pass();
   if (!capacityResume) webgpu::clear_present_source_override();
@@ -1396,6 +1552,10 @@ static void render_impl(std::vector<RenderPass>& renderPasses, wgpu::CommandEnco
         tex_palette_conv::run(cmd, conv);
       }
     }
+    if (passInfo.sceneFx) {
+      scene_fx::run(cmd, *passInfo.sceneFx, passInfo.copySourceTexture, passInfo.colorView,
+                    passInfo.copySourceDepthView, passInfo.targetSize);
+    }
     const bool hasRenderWork = passInfo.clearColor || passInfo.clearDepth || !passInfo.commands.empty();
     if (i == renderPasses.size() - 1) {
       ASSERT(!passInfo.resolveTarget, "Final render pass must not have resolve target");
@@ -1545,6 +1705,7 @@ static void render_impl(std::vector<RenderPass>& renderPasses, wgpu::CommandEnco
 }
 
 void seal_frame(SealedFrame& out) noexcept {
+  scene_fx_finish_frame();
   out.data().depthMapping = depth_peek::capture_frame_mapping();
   ZoneScoped;
   // The encode that could still have been holding these has completed: the

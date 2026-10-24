@@ -1,5 +1,4 @@
 extern "C" int g_spmBBoxArmed;
-namespace aurora::gx::fifo { extern float g_spmScreenWiden; }
 #include <atomic>
 #include "gx.hpp"
 #include "__gx.h"
@@ -492,14 +491,22 @@ void GXCopyTex(void* dest, GXBool clear) {
   if (aurora::gx::fifo::get_buffer_size() != 0) {
     aurora::gx::fifo::drain();
   }
+  if (!aurora::gx::is_depth_format(g_gxState.texCopyFmt)) {
+    aurora::gfx::scene_fx_prepare_texture_copy();
+  }
   auto sourceRect = map_texture_copy_source(g_gxState.texCopySrc, g_gxState.texCopySrcRenderSpace);
   // SPM: with the view widened past 16:9 (Hor+), the game's screen coordinates squeeze toward the centre. A copy
   // of part of the screen (the door-opening effect copies the door) must take the same squeeze to find it;
   // full-width copies stay full-width, since what they're drawn back with covers the whole screen. Near-full ones
   // too: the Fort Francis elevator's offscreen copy is 608 of 640 wide and was stretched ~12% (issue #41, mobby45).
-  if (const float widen = aurora::gx::fifo::g_spmScreenWiden; widen < 1.f && !g_gxState.texCopySrcRenderSpace &&
+  // A flip can first replay a full-screen capture through an unmodified pixel camera. Cropping that image
+  // with the last WORLD camera's correction selects the scenery beside Mario instead of Mario himself.
+  const float rawScaleX = g_gxState.xfProjection[0];
+  const float widen = rawScaleX != 0.f ? g_gxState.proj.m0[0] / rawScaleX : 1.f;
+  if (widen < 1.f && !g_gxState.texCopySrcRenderSpace &&
       g_gxState.texCopySrc.width < static_cast<int32_t>(aurora::gx::logical_fb_size().x * 0.75f)) {
-    const float cx = static_cast<float>(aurora::gfx::get_render_target_size().x) * 0.5f;
+    const float cx = (g_gxState.xfViewport[3] - 342.f) *
+                     static_cast<float>(aurora::gfx::get_render_target_size().x) / aurora::gx::logical_fb_size().x;
     auto& sr = sourceRect.sampleRect;
     sr.x() = cx + (sr.x() - cx) * widen;
     sr.z() *= widen;
@@ -612,6 +619,9 @@ void GXCopyTex(void* dest, GXBool clear) {
                             sourceRect.sampleRect.w() / std::max<float>(g_gxState.texCopySrc.height, 1.0f),
                             (g_gxState.copyClamp & GX_CLAMP_TOP) != 0,
                             (g_gxState.copyClamp & GX_CLAMP_BOTTOM) != 0, persistentCopy);
+  if (clear) {
+    aurora::gfx::scene_fx_copy_clear_boundary();
+  }
   ++handle.revision;
   handle.lastProducedFrame = currentFrame;
   handle.width = logicalDstWidth;

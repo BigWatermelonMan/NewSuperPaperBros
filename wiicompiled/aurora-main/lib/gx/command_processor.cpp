@@ -504,6 +504,15 @@ static void apply_xf_projection() {
       widen = aspect / wide;
       g_spmScreenWiden = widen;
     }
+    // SPM camera 5 is the fixed 25-degree, 4:3 EFB-pixel perspective camera (P00=3.383, P11=4.5107).
+    // Animated doors/other captured map objects use it even in widescreen. Their coordinates were projected
+    // by the world camera before Hor+, so carry the world's correction into this camera too. Square shadow
+    // cameras and small texture-bake viewports must retain their own projection.
+    const bool paperCamera = g_gxState.projType == GX_PERSPECTIVE &&
+                             std::abs(raw[0] - 3.383f) < 0.01f && std::abs(raw[2] - 4.5107f) < 0.01f;
+    if (paperCamera && screenSized) {
+      widen = g_spmScreenWiden;
+    }
   } else if (wide <= 0.0f) {
     g_spmScreenWiden = 1.0f;
   }
@@ -526,12 +535,14 @@ static void apply_xf_projection() {
   g_gxState.stateDirty = true;
 }
 
+
 // Forward declarations for register handlers
 static void handle_bp(u32 value, bool bigEndian);
 static void handle_cp(u8 addr, u32 value, bool bigEndian);
 static void handle_xf(const u8* data, u32& pos, u32 size, bool bigEndian);
 static bool handle_draw(u8 cmd, const u8* data, u32& pos, u32 size, bool bigEndian);
 static bool handle_aurora(const u8* data, u32& pos, u32 size, bool bigEndian);
+static void scene_fx_observe_draw();
 
 // NSMBW: time spent decoding GX commands (and waiting for the renderer lock first), and draws
 // decoded, for the runtime's NSMBW_LOG_FPS breakdown.
@@ -2824,6 +2835,7 @@ bool submit_raw_draw(GXPrimitive prim, GXVtxFmt fmt, const uint8_t* vertices, ui
 
   // This entry point bypasses process(), so it owns the renderer lock itself.
   std::unique_lock gpuLock(aurora::renderer_gpu_mutex());
+  scene_fx_observe_draw();
   if (!admit_draw(prim, fmt, vtxCount, vertexBytes)) {
     gpuLock.unlock();
     gfx::split_staging_batch();
@@ -2841,6 +2853,46 @@ bool submit_raw_draw(GXPrimitive prim, GXVtxFmt fmt, const uint8_t* vertices, ui
                        interpolationIdentityActive ? draw_geometry_signature(fmt, vertices, vtxCount, vtxSize) : 0,
                        interpolationIdentityActive);
   return true;
+}
+
+// Lost Pages scene effects: depth-writing draws make up the world (SPM's 2D camera is orthographic,
+// Flip 3D perspective); the first depth-test-off draw on another camera after them (HUD, menus)
+// gets the effects pass inserted before it.
+static void scene_fx_observe_draw() {
+  if (!g_gxState.stateDirty) {
+    return;  // same state as the previous draw: nothing to learn
+  }
+  {  // SPM_SCENE_FX_CAMLOG: every camera / depth-mode change within a few sampled frames
+    static const bool camLog = std::getenv("SPM_SCENE_FX_CAMLOG") != nullptr;
+    static Mat4x4<float> lastProj{};
+    static int lastFlags = -1;
+    static u32 drawsSince = 0;
+    static u32 logged = 0;
+    ++drawsSince;
+    const u32 frame = gfx::current_frame();
+    const int flags = (g_gxState.depthCompare ? 1 : 0) | (g_gxState.depthUpdate ? 2 : 0) |
+                      (g_gxState.projType == GX_ORTHOGRAPHIC ? 4 : 0) | (gfx::is_offscreen() ? 8 : 0);
+    if (camLog && frame % 400 == 200 && logged < 600 &&
+        (std::memcmp(&lastProj, &g_gxState.proj, sizeof(lastProj)) != 0 || flags != lastFlags)) {
+      ++logged;
+      const auto& p = g_gxState.proj;
+      const auto& vp = g_gxState.renderViewport;
+      std::fprintf(stderr,
+                   "[scenecam] f%u after %u: %s zc%d zu%d off%d p00=%.5f p11=%.5f p02=%.4f p03=%.2f p12=%.4f p13=%.2f "
+                   "a=%.7f b=%.4f vp=%.0f,%.0f %.0fx%.0f z%.3f-%.3f\n",
+                   frame, drawsSince, (flags & 4) ? "ORTHO" : "PERSP", flags & 1, (flags >> 1) & 1, (flags >> 3) & 1,
+                   p.m0[0], p.m1[1], p.m0[2], p.m0[3], p.m1[2], p.m1[3], p.m2[2], p.m2[3], vp.left, vp.top, vp.width,
+                   vp.height, vp.znear, vp.zfar);
+      drawsSince = 0;
+    }
+    lastProj = g_gxState.proj;
+    lastFlags = flags;
+  }
+  if (g_gxState.depthCompare && g_gxState.depthUpdate) {
+    gfx::scene_fx_note_scene_draw(g_gxState.proj, g_gxState.projType == GX_ORTHOGRAPHIC, g_gxState.renderViewport);
+  } else if (!g_gxState.depthCompare && gfx::scene_fx_try_split(g_gxState.proj)) {
+    g_gxState.stateDirty = true;
+  }
 }
 
 static bool handle_draw(u8 cmd, const u8* data, u32& pos, u32 size, bool bigEndian) {
@@ -2889,6 +2941,7 @@ static bool handle_draw(u8 cmd, const u8* data, u32& pos, u32 size, bool bigEndi
     if (fullScreenQuad) g_gxState.stateDirty = true;  // its projection differs from its neighbours': never merge
   }
 
+  scene_fx_observe_draw();
   DrawData* mergeTarget = nullptr;
   // NSMBW debugging: NSMBW_NO_MERGE turns draw merging off.
   static const int noMergeMode = [] {

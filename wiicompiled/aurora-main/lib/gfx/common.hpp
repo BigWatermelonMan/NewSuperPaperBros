@@ -340,6 +340,13 @@ void resolve_pass(TextureHandle texture, ClipRect rect, bool clearColor, bool cl
 void begin_offscreen(uint32_t width, uint32_t height);
 void end_offscreen();
 bool is_offscreen() noexcept;
+// Lost Pages scene effects (scene_fx.hpp): the GX decoder reports the world's depth-writing draws,
+// and asks for the effects pass at each depth-test-off draw; it is inserted before the first one on a
+// camera the world did not use (the HUD). True when it was inserted.
+void scene_fx_note_scene_draw(const Mat4x4<float>& proj, bool ortho, const Viewport& viewport) noexcept;
+bool scene_fx_try_split(const Mat4x4<float>& proj) noexcept;
+void scene_fx_prepare_texture_copy() noexcept;
+void scene_fx_copy_clear_boundary() noexcept;
 uint32_t get_sample_count() noexcept;
 void clear_caches() noexcept;
 

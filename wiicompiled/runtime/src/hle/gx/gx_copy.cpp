@@ -14,6 +14,7 @@
 #include <map>
 #include <mutex>
 #include <vector>
+#include <xxhash.h>
 
 namespace {
 // Copy destinations stay GPU-only until an explicit/lazy readback. Track the
@@ -22,7 +23,12 @@ namespace {
 // subsequent GXLoadTexObj. There is at most one live range per destination;
 // rewriting the destination replaces its previous extent.
 std::mutex g_efbCopyDestinationsMutex;
-std::map<uint32_t, uint32_t> g_efbCopyDestinations;
+struct EfbCopyDestination {
+    uint32_t size = 0;
+    uint64_t downloadedHash = 0;
+    bool hasDownloadedHash = false;
+};
+std::map<uint32_t, EfbCopyDestination> g_efbCopyDestinations;
 uint32_t g_largestEfbCopyDestination = 0;
 
 void RememberEfbCopyDestination(uint32_t addr, uint32_t size) {
@@ -30,7 +36,7 @@ void RememberEfbCopyDestination(uint32_t addr, uint32_t size) {
         return;
     }
     std::lock_guard<std::mutex> guard(g_efbCopyDestinationsMutex);
-    g_efbCopyDestinations[CanonicalizeGxMainRamAddress(addr)] = size;
+    g_efbCopyDestinations[CanonicalizeGxMainRamAddress(addr)] = EfbCopyDestination{size};
     // A conservative monotonic maximum lets invalidation jump directly to
     // the only map interval that could overlap instead of walking every copy
     // destination on every DCStoreRange.
@@ -54,11 +60,19 @@ void DownloadEfbCopiesForRange(uint32_t addr, uint32_t size) {
         const uint64_t earliest = start > g_largestEfbCopyDestination ? start - g_largestEfbCopyDestination : 0;
         for (auto it = g_efbCopyDestinations.lower_bound(static_cast<uint32_t>(earliest));
              it != g_efbCopyDestinations.end() && static_cast<uint64_t>(it->first) < end; ++it) {
-            if (static_cast<uint64_t>(it->first) + it->second > start) overlapping.push_back(it->first);
+            if (static_cast<uint64_t>(it->first) + it->second.size > start) overlapping.push_back(it->first);
         }
     }
     for (const uint32_t copyAddr : overlapping) {
-        aurora_flush_efb_copy_to_ram(GuestToHostPtr(copyAddr));  // no-op unless still pending
+        if (aurora_flush_efb_copy_to_ram(GuestToHostPtr(copyAddr))) {
+            // SPM flushes offscreen captures merely to make them CPU-readable, then samples the same texture.
+            // Remember the native RAM image so that this readback doesn't destroy its high-resolution GPU copy.
+            std::lock_guard<std::mutex> guard(g_efbCopyDestinationsMutex);
+            if (auto it = g_efbCopyDestinations.find(copyAddr); it != g_efbCopyDestinations.end()) {
+                it->second.downloadedHash = XXH3_64bits(GuestToHostPtr(copyAddr, it->second.size), it->second.size);
+                it->second.hasDownloadedHash = true;
+            }
+        }
     }
 }
 
@@ -77,8 +91,15 @@ void InvalidateEfbCopyDestinationsForRange(uint32_t addr, uint32_t size) {
         for (auto it = g_efbCopyDestinations.lower_bound(static_cast<uint32_t>(earliestCandidate));
              it != g_efbCopyDestinations.end() && static_cast<uint64_t>(it->first) < dirtyEnd;) {
             const uint64_t copyStart = it->first;
-            const uint64_t copyEnd = copyStart + it->second;
+            const uint64_t copyEnd = copyStart + it->second.size;
             if (dirtyEnd <= copyStart || dirtyStart >= copyEnd) {
+                ++it;
+                continue;
+            }
+            // A cache flush is not necessarily a write. Keep the scaled capture while the downloaded bytes
+            // are unchanged; real CPU/DMA writes and recycled allocations still invalidate it immediately.
+            if (it->second.hasDownloadedHash &&
+                XXH3_64bits(GuestToHostPtr(it->first, it->second.size), it->second.size) == it->second.downloadedHash) {
                 ++it;
                 continue;
             }
