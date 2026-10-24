@@ -10,6 +10,55 @@ with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the ga
 | ![Gloam Valley](screenshots/mi1_01.png) | ![Lineland Road](screenshots/he1_02.png) |
 | ![The Bitlands](screenshots/ta1_02.png) | ![Sammer's Kingdom](screenshots/wa1_02.png) |
 
+## Super Paper Mario ~ The Lost Pages (work in progress)
+
+This fork is turning the port into **Super Paper Mario ~ The Lost Pages**: a revamp with TTYD-style turn-based
+combat, Star Points, badges, and later a post-game side story. The changes so far are listed below; everything is in
+the `lost-pages` branch.
+
+### Enhanced lighting
+
+A post-processing pass over the game's 3D scene, before the HUD is drawn:
+
+- Paper diorama drop shadows on every layer, like Gloam Valley's look, plus ambient occlusion
+- Glossy floors in the style of the TTYD remake: soft reflections of what stands on them, with a bright lip
+- Sun rays only in open outdoor rooms, tinted with the area's own colours
+- Per-pixel lighting, and a lighting section in the F10 settings menu to tune or turn off each effect
+
+| Original | The Lost Pages |
+|---|---|
+| ![Lineland Road, original lighting](screenshots/lost-pages/lighting-off.png) | ![Lineland Road, enhanced lighting](screenshots/lost-pages/lighting-on.png) |
+
+### Turn-based battles
+
+Touching an enemy no longer trades stomp damage. It starts a TTYD-style turn-based battle:
+
+- First strikes, a Jump/Hammer/Items command menu, action commands, and Guard/Superguard timing
+- **Star Points** are earned for each enemy and act as EXP. At each level-up you choose **HP** or **ATK**
+- Score is now cosmetic only, saved for a future Flipside cosmetics shop
+
+Each battle draws a green-and-black zigzag border onto the screen, in SPM's digital style. A **pop-up paper
+diorama of the area** then stands up behind the fighters, made of that area's typical scenery rather than a copy of
+the spot. There are 16 area presets, from Lineland Road and Yold Desert to Outer Space and Castle Bleck. The lighting
+stays on in battle: the fighters drop shadows onto the diorama, the stage floor is glossy, and sun rays shine
+through outdoor skies.
+
+| | |
+|---|---|
+| ![Battle intro: the zigzag border draws on and the diorama pops up](screenshots/lost-pages/battle-intro.png) | ![A Lineland Road battle](screenshots/lost-pages/battle-lineland.png) |
+| ![A Yold Desert battle diorama](screenshots/lost-pages/battle-yold.png) | ![The 16 area dioramas](screenshots/lost-pages/battle-presets.png) |
+
+### Test area
+
+Press **F10 on the title screen** to open a test room with blank green-and-white textures. It holds a roster of test
+enemies (Goomba, Koopa Troopa, Sproing-Oing, Squiglet and Piranha Plant), and new features will be tried there first.
+
+| | |
+|---|---|
+| ![The test area](screenshots/lost-pages/test-area.png) | ![A battle in the test area](screenshots/lost-pages/test-area-battle.png) |
+
+Design notes are in [docs/lost-pages](docs/lost-pages).
+
 ## Features
 
 - Up to 4K, borderless 1080p by default
