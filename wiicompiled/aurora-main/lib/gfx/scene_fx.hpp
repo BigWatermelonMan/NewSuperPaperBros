@@ -50,9 +50,10 @@ struct Uniform {
   float sun[4];      // sun position in screen UV (may be off-screen), seconds, outdoor hint
   float stage[4];    // stage mode, seconds in mode, floor V, unused
   float stage2[4];   // test room: origin U, U per unit, V per unit, unused
-  float palette[8][4];  // the battle diorama's colours (see the shader)
-  float motif[4];       // its sky, far skyline, mid and near props
-  float motif2[4];      // its ground pattern, preset
+  float palette[10][4];  // the battle diorama's colours (see the shader)
+  float motif[4];        // its back, far skyline, mid and near props
+  float motif2[4];       // its ground pattern, preset
+  float motif3[4];       // its style, wing prop, open sky
 };
 
 // Builds the pass parameters from the scene camera; false when the camera is not usable.

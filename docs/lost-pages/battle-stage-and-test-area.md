@@ -22,8 +22,10 @@ while Yold Desert has dunes, cacti and rocks. Each preset has five paper cards:
 A ground strip slides in below the walking line. The far cards stand up first. The cards have white cut edges,
 cast drop shadows onto each other, and sway a little once up.
 
-There are 16 presets, defined in `StagePresets` in `aurora-main/lib/gfx/scene_fx.cpp`: shapes plus an 8-colour
-palette. `StagePresetFor` in `lp_testarea.cpp` maps map prefixes to presets. Set `SPM_LP_STAGE_PRESET=n` to force
+There are 23 presets, one per sub-area, matched against screenshots of each area. They are defined in
+`StagePresets` in `aurora-main/lib/gfx/scene_fx.cpp`. Each preset sets a back card (sky or wall pattern), a far
+skyline, mid and near prop rows, wing props, a ground pattern, a drawing style (paper, line art, neon or pixel art)
+and a 10-colour palette. `StagePresetFor` in `lp_testarea.cpp` maps map prefixes to presets. Set `SPM_LP_STAGE_PRESET=n` to force
 one preset in every battle. Test-area battles use the test room as their stage.
 
 Lighting stays on in battle:
@@ -34,6 +36,8 @@ Lighting stays on in battle:
 * Outdoor presets get softened sun rays through the diorama's sky, with the area's tint measured in the field.
 
 Only the battle's own enemies are drawn during a fight (the `npcDisp` hook); other NPCs in the room are hidden.
+Active map objects (? blocks, bricks, switches, save blocks: mobjdrv's entries) and field items (itemdrv's) are
+parked 10000 units below their spot for the battle and restored when it ends.
 Non-flying enemies stand on the stage floor, and flyers hover. `marioGetScreenPos` reports y on the 528-line EFB,
 so the stage scales y by 480/528.
 

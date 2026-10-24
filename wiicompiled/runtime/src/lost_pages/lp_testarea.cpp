@@ -93,18 +93,19 @@ std::vector<std::string> TestAreaRoster() { return g_roster; }
 // Which area's diorama a battle in `map` gets (the presets in aurora's scene_fx.cpp).
 int StagePresetFor(const std::string& map) {
     static constexpr std::pair<const char*, int> kAreas[] = {
-        {"he1", 1}, {"he2", 2}, {"he3", 3}, {"he4", 4},                // Lineland
-        {"mi1", 5}, {"mi", 6},                                        // Gloam Valley, Merlee's Mansion
-        {"ta4", 8}, {"ta", 7},                                        // Fort Francis, the Bitlands
-        {"sp", 9},                                                    // Outer Space
-        {"gn3", 11}, {"gn4", 11}, {"gn", 10},                         // Floro Caverns, Land of the Cragnons
-        {"wa", 12},                                                   // Sammer's Kingdom
-        {"an1", 13}, {"an2", 13}, {"an", 14},                         // the Underwhere, the Overthere
-        {"ls", 15},                                                   // Castle Bleck
+        {"he1", 1}, {"he2", 2}, {"he3", 3}, {"he4", 4},    // Lineland Road, Mount Lineland, Yold Desert, Yold Ruins
+        {"mi1", 5}, {"mi4", 7}, {"mi", 6},                // Gloam Valley, the mansion's basement, Merlee's Mansion
+        {"ta1", 8}, {"ta2", 9}, {"ta3", 10}, {"ta4", 11}, // the Bitlands, Tile Pool, Dotwood Tree, Fort Francis
+        {"sp2", 13}, {"sp4", 14}, {"sp", 12},             // Planet Blobule, the Whoa Zone, Outer Space
+        {"gn3", 16}, {"gn4", 16}, {"gn", 15},             // Floro Caverns, Land of the Cragnons
+        {"wa1", 17}, {"wa", 18},                          // Sammer's Kingdom, then in the void
+        {"an1", 19}, {"an2", 19}, {"an", 20},             // the Underwhere, the Overthere
+        {"ls", 21},                                       // Castle Bleck
+        {"dan", 23},                                      // the Pits of 100 Trials
     };
     for (const auto& [prefix, preset] : kAreas)
         if (map.rfind(prefix, 0) == 0) return preset;
-    return 16;  // Flipside, Flopside, the Pits and the rest
+    return 22;  // Flipside, Flopside and the rest
 }
 
 void SetStage(Guest& g, int mode, const Vec3& floorPoint) {

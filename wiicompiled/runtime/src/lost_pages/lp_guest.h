@@ -93,6 +93,7 @@ public:
     bool ScreenPos(const Vec3& world, float& sx, float& sy);
     uint32_t MarioPtr() { return Call(Fn::marioGetPtr); }
     uint32_t PouchPtr() { return Call(Fn::pouchGetPtr); }
+    uint32_t Sda() const { return ctx_->gpr[13]; }  // r13: the game's small-data base
 
 private:
     CpuContext* ctx_;

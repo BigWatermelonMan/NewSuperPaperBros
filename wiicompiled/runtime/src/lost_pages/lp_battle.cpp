@@ -112,6 +112,47 @@ struct State {
 };
 
 State s;
+
+// Blocks, switches and other map objects (mobjs) and items lying in the field aren't part of the diorama: they are
+// parked far below the stage while the battle runs, then put back exactly where they were.
+constexpr uint32_t kMobjWorkSda = 0x7FF0;  // mobjdrv's work pointer at r13 - 0x7FF0 (MobjWork: count, entries)
+constexpr uint32_t kMobjSize = 0x2A8, kMobjPos = 0x18;
+constexpr uint32_t kItemSize = 0x88, kItemPos = 0x14;  // itemGetWork(): ItemWork { num, entries }
+constexpr uint32_t kItemGetWork = 0x80077548;
+constexpr float kParkDrop = -10000.f;
+struct Parked {
+    uint32_t pos;
+    Vec3 home;
+};
+std::vector<Parked> g_parked;
+
+void ParkFieldObjects(Guest& g) {
+    if (g_parked.empty()) {
+        auto collect = [](uint32_t work, uint32_t size, uint32_t posOffset) {
+            if (!Memory::Contains(work, 8)) return;
+            const uint32_t count = std::min<uint32_t>(Memory::Read32(work), 0x400);
+            const uint32_t entries = Memory::Read32(work + 4);
+            if (!Memory::Contains(entries, count * size)) return;
+            for (uint32_t i = 0; i < count; ++i) {
+                const uint32_t e = entries + i * size;
+                if (Memory::Read32(e) & 1) g_parked.push_back({e + posOffset, ReadVec3(e + posOffset)});  // active
+            }
+        };
+        uint32_t mobjWork = 0;
+        if (Memory::TryRead32(g.Sda() - kMobjWorkSda, mobjWork)) collect(mobjWork, kMobjSize, kMobjPos);
+        collect(g.Call(kItemGetWork), kItemSize, kItemPos);
+        RT_LOGF(RT_TAG_RUNTIME, "[lpbattle] parked %zu field objects\n", g_parked.size());
+        if (g_parked.empty()) g_parked.push_back({0, {}});  // nothing to park: don't look again this battle
+    }
+    for (const auto& p : g_parked)
+        if (p.pos) WriteVec3(p.pos, {p.home.x, p.home.y + kParkDrop, p.home.z});
+}
+
+void UnparkFieldObjects() {
+    for (const auto& p : g_parked)
+        if (p.pos) WriteVec3(p.pos, p.home);
+    g_parked.clear();
+}
 std::mutex g_uiMutex;
 BattleUi g_ui;
 
@@ -335,6 +376,7 @@ void Begin(Guest& g) {
 }
 
 void Finish(Guest& g) {
+    UnparkFieldObjects();
     g.Call(Fn::evtStartAll, {0xFFu});
     // Back to the real map (the test area keeps its own painted room).
     if (TestAreaActive()) {
@@ -868,6 +910,7 @@ void Tick(Guest& g) {
     // The stage: the map hides and the area's pop-up diorama stands up behind the fighters.
     if (++s.stageFrame == 1 && !TestAreaActive()) g.Call(Fn::mapDispOff);
     SetStage(g, 2, s.marioHome);
+    ParkFieldObjects(g);
     // Hold everyone where the battle wants them.
     const uint32_t mario = g.MarioPtr();
     WriteVec3(mario + Mario::position, s.marioPos);

@@ -72,30 +72,37 @@ static constexpr float BloomThreshold = 0.78f;
 static constexpr float SunU = 0.2f;
 static constexpr float SunV = -0.3f;
 
-// The battle dioramas, one per area: shapes (see the shader's stage section) and colours.
+// The battle dioramas, one per area: shapes and styles (see the shader's stage section) and colours.
 struct StagePreset {
-  float sky, far, mid, near, ground;
-  float colors[8][3];  // sky top, sky bottom, far, mid, near, ground top, ground face, accent
+  float back, far, mid, near, ground, style, wing, openSky;
+  float colors[10][3];  // back top, back bottom, far, mid, near, ground top, ground face, accent, detail, glow
 };
 // clang-format off
 static constexpr StagePreset StagePresets[] = {
-  /* 0 test room */ {0, 8, 0, 0, 0, {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}}},
-  /* 1 Lineland Road */ {1, 9, 15, 11, 0, {{.36f, .68f, .98f}, {.78f, .93f, 1}, {.50f, .80f, .45f}, {.24f, .62f, .30f}, {.32f, .72f, .34f}, {.42f, .80f, .34f}, {.80f, .60f, .38f}, {.58f, .38f, .22f}}},
-  /* 2 Mount Lineland */ {3, 1, 2, 12, 5, {{.42f, .70f, .96f}, {.86f, .93f, 1}, {.60f, .58f, .66f}, {.72f, .56f, .40f}, {.62f, .50f, .40f}, {.52f, .74f, .38f}, {.64f, .50f, .38f}, {.50f, .38f, .28f}}},
-  /* 3 Yold Desert */ {0, 2, 3, 12, 3, {{.98f, .70f, .38f}, {1, .91f, .66f}, {.94f, .74f, .46f}, {.36f, .62f, .34f}, {.80f, .60f, .40f}, {.99f, .87f, .58f}, {.90f, .70f, .42f}, {.30f, .50f, .30f}}},
-  /* 4 Yold Ruins */ {0, 5, 4, 12, 1, {{.10f, .08f, .06f}, {.30f, .22f, .14f}, {.64f, .52f, .38f}, {.78f, .66f, .48f}, {.60f, .50f, .38f}, {.74f, .62f, .44f}, {.58f, .46f, .32f}, {.50f, .40f, .30f}}},
-  /* 5 Gloam Valley */ {2, 1, 9, 13, 5, {{.16f, .10f, .32f}, {.52f, .34f, .62f}, {.30f, .22f, .46f}, {.46f, .32f, .62f}, {.38f, .30f, .56f}, {.50f, .44f, .70f}, {.32f, .26f, .46f}, {.26f, .20f, .36f}}},
-  /* 6 Merlee's Mansion */ {0, 5, 4, 8, 4, {{.08f, .04f, .10f}, {.24f, .10f, .20f}, {.56f, .20f, .30f}, {.88f, .78f, .56f}, {.92f, .80f, .45f}, {.70f, .22f, .26f}, {.46f, .14f, .20f}, {.35f, .25f, .15f}}},
-  /* 7 The Bitlands */ {1, 3, 5, 14, 2, {{.16f, .54f, .96f}, {.56f, .86f, 1}, {.22f, .74f, .38f}, {.96f, .62f, .22f}, {.92f, .34f, .30f}, {.40f, .84f, .30f}, {.62f, .42f, .22f}, {.50f, .30f, .20f}}},
-  /* 8 Fort Francis */ {0, 4, 4, 14, 4, {{.18f, .08f, .16f}, {.46f, .24f, .40f}, {.82f, .46f, .66f}, {.58f, .58f, .68f}, {.70f, .40f, .60f}, {.74f, .74f, .82f}, {.46f, .46f, .56f}, {.40f, .40f, .50f}}},
-  /* 9 Outer Space */ {2, 7, 6, 12, 5, {{.02f, .02f, .08f}, {.10f, .05f, .26f}, {.58f, .38f, .88f}, {.36f, .82f, .96f}, {.50f, .50f, .62f}, {.62f, .62f, .78f}, {.36f, .36f, .52f}, {.90f, .70f, .40f}}},
-  /* 10 Land of the Cragnons */ {3, 1, 2, 12, 5, {{.52f, .74f, .96f}, {.96f, .90f, .80f}, {.72f, .54f, .40f}, {.64f, .46f, .32f}, {.56f, .42f, .30f}, {.78f, .62f, .44f}, {.56f, .40f, .28f}, {.40f, .30f, .20f}}},
-  /* 11 Floro Caverns */ {0, 6, 6, 12, 5, {{.02f, .06f, .08f}, {.08f, .20f, .22f}, {.20f, .32f, .36f}, {.42f, .95f, .82f}, {.26f, .36f, .36f}, {.32f, .44f, .44f}, {.18f, .26f, .28f}, {.30f, .40f, .40f}}},
-  /* 12 Sammer's Kingdom */ {3, 4, 7, 11, 1, {{.94f, .52f, .34f}, {1, .86f, .60f}, {.56f, .36f, .32f}, {.24f, .46f, .30f}, {.30f, .52f, .32f}, {.82f, .72f, .56f}, {.62f, .52f, .40f}, {.45f, .30f, .20f}}},
-  /* 13 The Underwhere */ {0, 1, 2, 12, 5, {{.10f, .02f, .05f}, {.42f, .08f, .12f}, {.26f, .08f, .12f}, {.46f, .16f, .22f}, {.38f, .14f, .18f}, {.52f, .26f, .26f}, {.30f, .12f, .14f}, {.30f, .10f, .10f}}},
-  /* 14 The Overthere */ {3, 2, 4, 10, 4, {{.66f, .84f, 1}, {1, .96f, .82f}, {.98f, .97f, .92f}, {.96f, .86f, .56f}, {.99f, .99f, .97f}, {.99f, .93f, .70f}, {.86f, .76f, .50f}, {.80f, .70f, .40f}}},
-  /* 15 Castle Bleck */ {2, 4, 4, 14, 2, {{.04f, .02f, .08f}, {.18f, .08f, .26f}, {.14f, .11f, .18f}, {.32f, .26f, .40f}, {.26f, .20f, .32f}, {.88f, .88f, .90f}, {.10f, .08f, .12f}, {.50f, .40f, .60f}}},
-  /* 16 Flipside and the rest */ {2, 3, 4, 14, 4, {{.24f, .18f, .44f}, {.56f, .50f, .76f}, {.46f, .40f, .70f}, {.86f, .82f, .96f}, {.70f, .64f, .88f}, {.82f, .80f, .92f}, {.50f, .46f, .66f}, {.60f, .50f, .80f}}},
+  /* 0 test room */ {0, 8, 0, 0, 0, 0, 0, 0, {{1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}}},
+  /* 1 Lineland Road */ {1, 9, 15, 11, 0, 0, 15, 1, {{.3f, .55f, .95f}, {.62f, .82f, .98f}, {.42f, .7f, .62f}, {.38f, .72f, .4f}, {.33f, .7f, .3f}, {.3f, .66f, .24f}, {.62f, .4f, .18f}, {.55f, .35f, .15f}, {1, 1, 1}, {.95f, .55f, .7f}}},
+  /* 2 Mount Lineland */ {1, 14, 23, 13, 0, 0, 23, 1, {{.3f, .55f, .95f}, {.62f, .82f, .98f}, {.82f, .52f, .3f}, {.42f, .28f, .16f}, {.55f, .62f, .25f}, {.8f, .58f, .32f}, {.66f, .42f, .22f}, {.42f, .28f, .16f}, {1, 1, 1}, {1, 1, 1}}},
+  /* 3 Yold Desert */ {0, 2, 16, 3, 3, 0, 16, 1, {{.22f, .58f, .86f}, {.7f, .88f, .92f}, {.92f, .64f, .36f}, {.3f, .58f, .26f}, {.4f, .62f, .32f}, {.96f, .76f, .46f}, {.88f, .62f, .34f}, {.62f, .42f, .22f}, {1, 1, 1}, {1, 1, 1}}},
+  /* 4 Yold Ruins */ {4, 8, 4, 18, 10, 0, 4, 0, {{.24f, .28f, .32f}, {.14f, .16f, .2f}, {.3f, .34f, .32f}, {.4f, .44f, .38f}, {.3f, .26f, .2f}, {.38f, .42f, .38f}, {.26f, .3f, .28f}, {.28f, .24f, .18f}, {.5f, .5f, .5f}, {1, .62f, .22f}}},
+  /* 5 Gloam Valley */ {9, 17, 17, 17, 4, 0, 17, 0, {{.97f, .97f, .95f}, {.92f, .93f, .9f}, {.99f, .99f, .98f}, {.22f, .52f, .22f}, {.28f, .58f, .26f}, {.97f, .97f, .95f}, {.9f, .9f, .88f}, {.2f, .45f, .2f}, {.8f, .8f, .8f}, {1, 1, 1}}},
+  /* 6 Merlee's Mansion */ {15, 5, 4, 8, 6, 0, 4, 0, {{.46f, .42f, .54f}, {.36f, .3f, .34f}, {.4f, .34f, .42f}, {.5f, .36f, .3f}, {.28f, .22f, .22f}, {.48f, .32f, .24f}, {.38f, .26f, .2f}, {.3f, .22f, .18f}, {.62f, .56f, .68f}, {1, .64f, .28f}}},
+  /* 7 Merlee's Mansion basement */ {4, 16, 0, 14, 6, 0, 0, 0, {{.46f, .34f, .28f}, {.32f, .24f, .2f}, {.42f, .3f, .2f}, {.5f, .4f, .3f}, {.58f, .42f, .26f}, {.46f, .32f, .22f}, {.34f, .24f, .18f}, {.4f, .3f, .2f}, {.5f, .5f, .5f}, {1, .7f, .3f}}},
+  /* 8 The Bitlands */ {5, 10, 24, 14, 9, 3, 24, 1, {{.32f, .62f, .95f}, {.72f, .88f, 1}, {.56f, .64f, .7f}, {.36f, .7f, .32f}, {.86f, .56f, .26f}, {.36f, .72f, .26f}, {.66f, .38f, .2f}, {.5f, .3f, .18f}, {1, 1, 1}, {1, .9f, .3f}}},
+  /* 9 The Tile Pool */ {14, 15, 0, 14, 4, 3, 0, 0, {{.3f, .36f, .74f}, {.18f, .22f, .56f}, {.5f, .44f, .74f}, {.4f, .4f, .7f}, {.4f, .4f, .68f}, {.52f, .52f, .74f}, {.36f, .36f, .58f}, {.3f, .3f, .5f}, {.46f, .54f, .86f}, {1, 1, 1}}},
+  /* 10 The Dotwood Tree */ {13, 8, 0, 14, 1, 3, 0, 0, {{.74f, .54f, .28f}, {.62f, .44f, .22f}, {.5f, .4f, .3f}, {.5f, .4f, .3f}, {.62f, .36f, .14f}, {.72f, .46f, .2f}, {.58f, .36f, .16f}, {.4f, .3f, .2f}, {.5f, .5f, .5f}, {1, 1, 1}}},
+  /* 11 Fort Francis */ {16, 4, 0, 14, 10, 3, 0, 0, {{.2f, .24f, .3f}, {.12f, .15f, .2f}, {.88f, .88f, .9f}, {.6f, .6f, .7f}, {.82f, .3f, .32f}, {.92f, .92f, .94f}, {.78f, .78f, .82f}, {.5f, .5f, .6f}, {.28f, .33f, .4f}, {1, 1, 1}}},
+  /* 12 Outer Space */ {6, 7, 25, 0, 5, 0, 0, 0, {{.12f, .14f, .32f}, {.06f, .08f, .2f}, {.66f, .3f, .58f}, {.4f, .4f, .52f}, {.4f, .4f, .5f}, {.34f, .34f, .48f}, {.22f, .22f, .34f}, {.5f, .5f, .6f}, {.03f, .03f, .09f}, {1, 1, 1}}},
+  /* 13 Planet Blobule */ {6, 8, 19, 12, 5, 0, 19, 0, {{.12f, .14f, .32f}, {.06f, .08f, .2f}, {.5f, .5f, .5f}, {.3f, .7f, .55f}, {.76f, .68f, .5f}, {.82f, .76f, .6f}, {.7f, .64f, .48f}, {.5f, .5f, .5f}, {.03f, .03f, .09f}, {.95f, .35f, .85f}}},
+  /* 14 The Whoa Zone */ {0, 8, 22, 0, 4, 0, 22, 0, {{.96f, .97f, .98f}, {.84f, .86f, .88f}, {.5f, .5f, .5f}, {.36f, .62f, .6f}, {.4f, .6f, .6f}, {.4f, .78f, .44f}, {.86f, .92f, .88f}, {.5f, .5f, .5f}, {.5f, .5f, .5f}, {1, 1, 1}}},
+  /* 15 Land of the Cragnons */ {5, 11, 2, 13, 3, 0, 2, 1, {{.25f, .55f, .95f}, {.7f, .86f, .98f}, {.84f, .72f, .64f}, {.66f, .66f, .62f}, {.42f, .6f, .3f}, {.9f, .78f, .55f}, {.8f, .66f, .45f}, {.5f, .4f, .3f}, {1, 1, 1}, {1, 1, 1}}},
+  /* 16 Floro Caverns */ {12, 16, 0, 6, 5, 0, 0, 0, {{.3f, .3f, .32f}, {.14f, .14f, .16f}, {.36f, .26f, .18f}, {.5f, .5f, .5f}, {.45f, .85f, .95f}, {.32f, .32f, .34f}, {.2f, .2f, .22f}, {.36f, .26f, .18f}, {.4f, .4f, .42f}, {.45f, .9f, .98f}}},
+  /* 17 Sammer's Kingdom */ {0, 12, 20, 13, 5, 0, 20, 1, {{.5f, .86f, .78f}, {.86f, .96f, .92f}, {.42f, .52f, .86f}, {.05f, .05f, .06f}, {.06f, .06f, .07f}, {.58f, .58f, .6f}, {.42f, .42f, .46f}, {.96f, .8f, .34f}, {1, 1, 1}, {1, 1, 1}}},
+  /* 18 Sammer's Kingdom in the void */ {10, 12, 20, 13, 5, 0, 20, 0, {{.36f, .1f, .52f}, {.08f, .26f, .22f}, {.86f, .46f, .72f}, {.05f, .05f, .06f}, {.06f, .06f, .07f}, {.58f, .58f, .6f}, {.42f, .42f, .46f}, {.3f, .82f, .56f}, {.04f, .02f, .06f}, {1, 1, 1}}},
+  /* 19 The Underwhere */ {0, 10, 24, 13, 1, 2, 24, 0, {{.1f, .08f, .18f}, {.04f, .06f, .1f}, {.06f, .06f, .12f}, {.07f, .08f, .14f}, {.06f, .08f, .12f}, {.22f, .18f, .26f}, {.14f, .12f, .18f}, {.06f, .07f, .12f}, {.3f, .3f, .4f}, {.3f, .95f, .85f}}},
+  /* 20 The Overthere */ {11, 13, 4, 10, 7, 0, 4, 1, {{.45f, .78f, .98f}, {.96f, .97f, .88f}, {.99f, .99f, 1}, {.96f, .95f, .9f}, {.99f, .99f, 1}, {1, 1, 1}, {.86f, .9f, .98f}, {.8f, .8f, .8f}, {1, 1, 1}, {1, 1, 1}}},
+  /* 21 Castle Bleck */ {7, 8, 21, 0, 8, 1, 0, 0, {{0, 0, 0}, {.02f, .02f, .03f}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {1, 1, 1}}},
+  /* 22 Flipside and Flopside */ {4, 8, 26, 0, 10, 0, 0, 0, {{.52f, .4f, .32f}, {.4f, .3f, .24f}, {.5f, .5f, .5f}, {.36f, .3f, .22f}, {.4f, .4f, .4f}, {.48f, .5f, .38f}, {.36f, .38f, .3f}, {.3f, .26f, .2f}, {.5f, .5f, .5f}, {.62f, .86f, .58f}}},
+  /* 23 The Pit of 100 Trials */ {0, 3, 0, 14, 1, 0, 0, 0, {{.8f, .77f, .62f}, {.7f, .68f, .54f}, {.16f, .14f, .13f}, {.5f, .5f, .5f}, {.18f, .16f, .15f}, {.6f, .34f, .36f}, {.48f, .26f, .28f}, {.3f, .3f, .3f}, {.5f, .5f, .5f}, {1, 1, 1}}},
 };
 // clang-format on
 
@@ -149,19 +156,23 @@ bool make_uniform(Uniform& out, const Mat4x4<float>& gxProj, bool ortho, const w
   out.stage[3] = 0.f;
   const int count = static_cast<int>(std::size(StagePresets));
   const StagePreset& preset = StagePresets[std::clamp(g_stagePreset.load(std::memory_order_relaxed), 0, count - 1)];
-  for (int i = 0; i < 8; ++i) {
+  for (int i = 0; i < 10; ++i) {
     out.palette[i][0] = preset.colors[i][0];
     out.palette[i][1] = preset.colors[i][1];
     out.palette[i][2] = preset.colors[i][2];
     out.palette[i][3] = 1.f;
   }
-  out.motif[0] = preset.sky;
+  out.motif[0] = preset.back;
   out.motif[1] = preset.far;
   out.motif[2] = preset.mid;
   out.motif[3] = preset.near;
   out.motif2[0] = preset.ground;
   out.motif2[1] = static_cast<float>(&preset - StagePresets);
   out.motif2[2] = out.motif2[3] = 0.f;
+  out.motif3[0] = preset.style;
+  out.motif3[1] = preset.wing;
+  out.motif3[2] = preset.openSky;
+  out.motif3[3] = 0.f;
   out.stage2[0] = g_stageOriginU.load(std::memory_order_relaxed);
   out.stage2[1] = g_stageUnitU.load(std::memory_order_relaxed);
   out.stage2[2] = g_stageUnitV.load(std::memory_order_relaxed);
@@ -182,9 +193,10 @@ struct Fx {
     sun: vec4f,
     stage: vec4f,
     stage2: vec4f,
-    palette: array<vec4f, 8>,
+    palette: array<vec4f, 10>,
     motif: vec4f,
     motif2: vec4f,
+    motif3: vec4f,
 };
 // Written by the compute pass (see StatsShader): how open the sky is and the area's sun tint.
 struct Stats {
@@ -443,7 +455,7 @@ fn blur(uv: vec2f, dir: vec2f) -> vec4f {
         // Battle stage: the diorama's sky card is the sky.
         let q = to_stage((vec2f(p) + 0.5) * fx.screen.zw);
         let card = card_at(q);
-        l = select(0.0, luma(sky_color(card.q)), card.index == 4 && q.y > 0.0 && !is_test_stage());
+        l = select(0.0, luma(back_color(card.q)), card.index == 4 && q.y > 0.0 && fx.motif3.z > 0.5);
     }
     return vec4f(smoothstep(0.2, 0.9, l), 0.0, 0.0, 1.0);
 }
@@ -612,13 +624,16 @@ fn ease_out_back(t: f32) -> f32 {
 }
 
 // Battle stages are pop-up dioramas of the area, not copies of the spot: paper cards made of the things typical of
-// it (Lineland's hills, trees and blocky clouds, Yold's dunes and cacti, ...), chosen by `fx.motif` and coloured by
-// `fx.palette`. Cards: 0 the wings at the screen's sides, 1 near props, 2 mid props, 3 the far skyline, 4 the sky;
-// below the walking line, the ground. Hinged on the walking line, the far cards stand up first.
+// it (Lineland's block trees and doodled sky, Gloam Valley's curly vines on white paper, Castle Bleck's line art,
+// ...), chosen by `fx.motif` and coloured by `fx.palette`. Cards: 0 the wings at the screen's sides, 1 near props,
+// 2 mid props, 3 the far skyline, 4 the back (sky or wall); below the walking line, the ground. Hinged on the walking
+// line, the far cards stand up first.
 // Stage space is in game pixels (480 per screen height): x from the screen's centre, y up from the walking line.
-// palette: 0 sky top, 1 sky bottom, 2 far, 3 mid, 4 near, 5 ground top, 6 ground face, 7 accent (trunks, stems)
-// motif: sky (0 plain, 1 block clouds, 2 stars, 3 round clouds), far (see sd_far), mid and near (see stage_prop)
-// motif2: ground (0 grass, 1 bricks, 2 checker, 3 sand, 4 tiles, 5 rock), preset (0 the test room)
+// palette: 0 back top, 1 back bottom, 2 far, 3 mid, 4 near, 5 ground top, 6 ground face, 7 accent (trunks, roofs),
+//          8 detail (doodles, stars, grid lines), 9 glow (windows, flames, neon)
+// motif: back (see back_color), far (see sd_far), mid and near (see stage_prop)
+// motif2: ground (see ground_color), preset (0 the test room)
+// motif3: style (0 paper, 1 line art, 2 neon, 3 pixel art), wing prop, open sky (sun rays), unused
 
 fn game_px() -> f32 { return fx.screen.y / 480.0; }
 
@@ -632,7 +647,13 @@ fn from_stage(q: vec2f) -> vec2f {
 
 fn is_test_stage() -> bool { return fx.motif2.y < 0.5; }
 
+fn stage_style() -> i32 { return i32(fx.motif3.x); }
+
 fn hash11(n: f32) -> f32 { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
+
+fn hash21(c: vec2f) -> f32 { return hash11(c.x * 17.13 + c.y * 91.7); }
+
+fn pixelate(p: vec2f, size: f32) -> vec2f { return (floor(p / size) + 0.5) * size; }
 
 fn sd_box(p: vec2f, c: vec2f, h: vec2f) -> f32 {
     let d = abs(p - c) - h;
@@ -641,7 +662,16 @@ fn sd_box(p: vec2f, c: vec2f, h: vec2f) -> f32 {
 
 fn sd_circle(p: vec2f, c: vec2f, r: f32) -> f32 { return length(p - c) - r; }
 
+fn sd_ring(p: vec2f, c: vec2f, r: f32, w: f32) -> f32 { return abs(length(p - c) - r) - w; }
+
 fn sd_ellipse(p: vec2f, c: vec2f, r: vec2f) -> f32 { return (length((p - c) / r) - 1.0) * min(r.x, r.y); }
+
+fn sd_seg(p: vec2f, a: vec2f, b: vec2f, r: f32) -> f32 {
+    let pa = p - a;
+    let ba = b - a;
+    let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return length(pa - ba * h) - r;
+}
 
 // A triangle standing on y = base.
 fn sd_peak(p: vec2f, base: f32, half: f32, height: f32) -> f32 {
@@ -649,17 +679,32 @@ fn sd_peak(p: vec2f, base: f32, half: f32, height: f32) -> f32 {
     return max(max(abs(p.x) - half * (1.0 - t), base - p.y), p.y - base - height);
 }
 
-// Union of (distance, part) pairs; part 0 takes the card's colour, 1 the accent, 2 a lighter card colour.
+fn sd_diamond(p: vec2f, c: vec2f, s: f32) -> f32 { return (abs(p.x - c.x) + abs(p.y - c.y) - s) * 0.7071; }
+
+// A five-pointed star.
+fn sd_star(p: vec2f, c: vec2f, r: f32, spin: f32) -> f32 {
+    let d = p - c;
+    let k = 0.5 + 0.5 * cos(5.0 * (atan2(d.y, d.x) + spin));
+    return length(d) - r * mix(0.45, 1.0, pow(k, 3.0));
+}
+
+// Union of (distance, part) pairs. Parts: 0 the card's colour, 1 accent, 2 a lighter card colour, 3 glow.
 fn sd_u(a: vec2f, b: vec2f) -> vec2f { return select(b, a, a.x < b.x); }
 
-// One prop standing at the origin. 0 none, 1 round tree, 2 rock spire, 3 cactus, 4 pillar, 5 block stack,
-// 6 crystal, 7 pine, 8 lamp post, 9 gloam tree, 10 cloud puff, 11 bush, 12 rock, 13 grass tuft, 14 block,
-// 15 block tree
+// One prop standing at the origin.
+//  0 none, 1 round tree, 2 rock spire, 3 cactus, 4 pillar, 5 block stack, 6 crystal, 7 pine, 8 lamp post,
+//  9 gloam tree, 10 cloud puff, 11 bush, 12 rock, 13 grass tuft, 14 block, 15 block tree, 16 palm, 17 curly vine,
+// 18 wall torch, 19 neon swirl plant, 20 black bamboo, 21 mandala, 22 floating diamonds, 23 dead tree,
+// 24 pixel tree, 25 asteroid, 26 window panel
 fn stage_prop(kind: i32, p: vec2f, seed: f32) -> vec2f {
-    if (kind == 1) {
-        let crown = min(sd_circle(p, vec2f(0.0, 72.0), 30.0),
-                        min(sd_circle(p, vec2f(-20.0, 56.0), 20.0), sd_circle(p, vec2f(20.0, 56.0), 20.0)));
-        return sd_u(vec2f(sd_box(p, vec2f(0.0, 26.0), vec2f(6.0, 26.0)), 1.0), vec2f(crown, 0.0));
+    if (kind == 1 || kind == 24) {
+        var q = p;
+        if (kind == 24) {
+            q = pixelate(p, 8.0);
+        }
+        let crown = min(sd_circle(q, vec2f(0.0, 72.0), 30.0),
+                        min(sd_circle(q, vec2f(-20.0, 56.0), 20.0), sd_circle(q, vec2f(20.0, 56.0), 20.0)));
+        return sd_u(vec2f(sd_box(q, vec2f(0.0, 26.0), vec2f(6.0, 26.0)), 1.0), vec2f(crown, 0.0));
     }
     if (kind == 2) {
         return vec2f(sd_peak(p, 0.0, 28.0, 110.0 + 40.0 * seed), 0.0);
@@ -683,7 +728,7 @@ fn stage_prop(kind: i32, p: vec2f, seed: f32) -> vec2f {
         return vec2f(sd_box(p, vec2f(0.0, h * 0.5), vec2f(18.0, h * 0.5)), 0.0);
     }
     if (kind == 6) {
-        return vec2f((abs(p.x) / 18.0 + abs(p.y - 55.0) / 55.0 - 1.0) * 16.0, 0.0);
+        return vec2f((abs(p.x) / 18.0 + abs(p.y - 55.0) / 55.0 - 1.0) * 16.0, 3.0);
     }
     if (kind == 7) {
         var d = vec2f(sd_box(p, vec2f(0.0, 12.0), vec2f(5.0, 12.0)), 1.0);
@@ -693,7 +738,7 @@ fn stage_prop(kind: i32, p: vec2f, seed: f32) -> vec2f {
         return d;
     }
     if (kind == 8) {
-        return sd_u(vec2f(sd_box(p, vec2f(0.0, 55.0), vec2f(3.0, 55.0)), 1.0), vec2f(sd_circle(p, vec2f(0.0, 118.0), 11.0), 0.0));
+        return sd_u(vec2f(sd_box(p, vec2f(0.0, 55.0), vec2f(3.0, 55.0)), 1.0), vec2f(sd_circle(p, vec2f(0.0, 118.0), 11.0), 3.0));
     }
     if (kind == 9) {
         return sd_u(vec2f(sd_box(p, vec2f(0.0, 42.0), vec2f(5.0, 42.0)), 1.0),
@@ -719,13 +764,91 @@ fn stage_prop(kind: i32, p: vec2f, seed: f32) -> vec2f {
     if (kind == 14) {
         return vec2f(sd_box(p, vec2f(0.0, 12.0), vec2f(12.0, 12.0)), 0.0);
     }
-    if (kind == 15) {  // Lineland's tree: a crown of overlapping squares, every other one lighter
+    if (kind == 15) {  // Lineland's tree: a crown of overlapping squares in greens with a pink one
         var d = vec2f(sd_box(p, vec2f(0.0, 34.0), vec2f(5.0, 34.0)), 1.0);
         d = sd_u(d, vec2f(sd_box(p, vec2f(-20.0, 74.0), vec2f(20.0, 20.0)), 0.0));
         d = sd_u(d, vec2f(sd_box(p, vec2f(18.0, 82.0), vec2f(19.0, 19.0)), 2.0));
-        d = sd_u(d, vec2f(sd_box(p, vec2f(-4.0, 104.0), vec2f(17.0, 17.0)), 0.0));
+        d = sd_u(d, vec2f(sd_box(p, vec2f(-4.0, 104.0), vec2f(17.0, 17.0)), select(0.0, 3.0, seed > 0.5)));
         d = sd_u(d, vec2f(sd_box(p, vec2f(20.0, 120.0), vec2f(12.0, 12.0)), 2.0));
         return d;
+    }
+    if (kind == 16) {  // palm: a curved trunk and fronds
+        var trunk = sd_seg(p, vec2f(0.0, 0.0), vec2f(6.0, 45.0), 5.0);
+        trunk = min(trunk, sd_seg(p, vec2f(6.0, 45.0), vec2f(16.0, 90.0), 4.5));
+        trunk = min(trunk, sd_seg(p, vec2f(16.0, 90.0), vec2f(20.0, 118.0), 4.0));
+        let top = vec2f(20.0, 120.0);
+        var fronds = sd_seg(p, top, vec2f(-18.0, 104.0), 5.0);
+        fronds = min(fronds, sd_seg(p, top, vec2f(-4.0, 134.0), 5.0));
+        fronds = min(fronds, sd_seg(p, top, vec2f(30.0, 140.0), 5.0));
+        fronds = min(fronds, sd_seg(p, top, vec2f(54.0, 116.0), 5.0));
+        fronds = min(fronds, sd_seg(p, top, vec2f(48.0, 96.0), 4.0));
+        return sd_u(vec2f(trunk, 1.0), vec2f(fronds, 0.0));
+    }
+    if (kind == 17) {  // Gloam Valley's curly vine
+        var d = sd_seg(p, vec2f(0.0, 0.0), vec2f(-2.0, 70.0), 3.0);
+        d = min(d, max(sd_ring(p, vec2f(10.0, 78.0), 12.0, 2.5), -sd_box(p, vec2f(16.0, 70.0), vec2f(8.0, 8.0))));
+        d = min(d, sd_ring(p, vec2f(14.0, 80.0), 5.0, 2.0));
+        d = min(d, sd_seg(p, vec2f(-1.0, 40.0), vec2f(-14.0, 52.0), 2.0));
+        d = min(d, sd_ring(p, vec2f(-18.0, 58.0), 7.0, 2.0));
+        return vec2f(d, 0.0);
+    }
+    if (kind == 18) {  // a torch on the wall
+        var d = vec2f(min(sd_box(p, vec2f(0.0, 108.0), vec2f(3.0, 10.0)), sd_box(p, vec2f(0.0, 120.0), vec2f(9.0, 4.0))), 1.0);
+        d = sd_u(d, vec2f(sd_ellipse(p, vec2f(0.0, 134.0), vec2f(6.0, 11.0)), 3.0));
+        return d;
+    }
+    if (kind == 19) {  // Planet Blobule's neon swirls
+        var d = vec2f(min(sd_seg(p, vec2f(0.0, 0.0), vec2f(4.0, 60.0), 2.0), sd_seg(p, vec2f(2.0, 30.0), vec2f(-8.0, 36.0), 1.6)), 0.0);
+        d = sd_u(d, vec2f(min(sd_ring(p, vec2f(14.0, 72.0), 12.0, 2.5), sd_ring(p, vec2f(-12.0, 40.0), 6.0, 2.0)), 3.0));
+        return d;
+    }
+    if (kind == 20) {  // Sammer's black bamboo: thin stalks with leaf blades
+        var d = sd_seg(p, vec2f(0.0, 0.0), vec2f(-8.0, 160.0), 4.5);
+        d = min(d, sd_seg(p, vec2f(4.0, 0.0), vec2f(16.0, 125.0), 4.0));
+        d = min(d, sd_seg(p, vec2f(-3.0, 0.0), vec2f(-24.0, 100.0), 3.6));
+        for (var k = 0; k < 6; k++) {
+            let t = 0.45 + 0.1 * f32(k);
+            let side = select(-1.0, 1.0, (k & 1) == 0);
+            let at = mix(vec2f(0.0, 0.0), vec2f(-8.0, 160.0), t);
+            d = min(d, sd_seg(p, at, at + vec2f(side * 20.0, 6.0 - 8.0 * f32(k % 3)), 4.4));
+            let at2 = mix(vec2f(4.0, 0.0), vec2f(16.0, 125.0), t);
+            d = min(d, sd_seg(p, at2, at2 + vec2f(-side * 16.0, 4.0), 4.0));
+        }
+        return vec2f(d, 0.0);
+    }
+    if (kind == 21) {  // line-art mandala
+        let c = vec2f(0.0, 170.0 + 50.0 * seed);
+        var d = min(sd_ring(p, c, 34.0, 1.2), sd_ring(p, c, 22.0, 1.2));
+        for (var k = 0; k < 8; k++) {
+            let a = f32(k) * 0.785398 + seed;
+            d = min(d, sd_seg(p, c + vec2f(cos(a), sin(a)) * 10.0, c + vec2f(cos(a), sin(a)) * 34.0, 1.0));
+        }
+        return vec2f(d, 0.0);
+    }
+    if (kind == 22) {
+        var d = sd_diamond(p, vec2f(0.0, 80.0), 14.0);
+        d = min(d, sd_diamond(p, vec2f(28.0, 112.0), 11.0));
+        d = min(d, sd_diamond(p, vec2f(-16.0, 140.0), 9.0));
+        return vec2f(d, 0.0);
+    }
+    if (kind == 23) {  // a bare tree
+        var d = sd_seg(p, vec2f(0.0, 0.0), vec2f(2.0, 92.0), 5.0);
+        d = min(d, sd_seg(p, vec2f(1.0, 58.0), vec2f(-24.0, 88.0), 3.0));
+        d = min(d, sd_seg(p, vec2f(2.0, 74.0), vec2f(26.0, 104.0), 3.0));
+        d = min(d, sd_seg(p, vec2f(-14.0, 76.0), vec2f(-20.0, 104.0), 2.0));
+        return vec2f(d, 1.0);
+    }
+    if (kind == 25) {  // a floating asteroid
+        let c = vec2f(0.0, 150.0 + 60.0 * seed);
+        let d = p - c;
+        let r = 20.0 + 8.0 * seed + 5.0 * sin(atan2(d.y, d.x) * 5.0 + seed * 20.0);
+        return vec2f(length(d) - r, 0.0);
+    }
+    if (kind == 26) {  // a glowing window of square panes
+        let c = vec2f(0.0, 210.0);
+        let box = sd_box(p, c, vec2f(44.0, 44.0));
+        let g = abs(fract((p - c + 44.0) / 22.0) - 0.5) * 22.0;
+        return vec2f(box, select(3.0, 1.0, min(g.x, g.y) < 2.0 || box > -3.0));
     }
     return vec2f(1e5, 0.0);
 }
@@ -749,8 +872,10 @@ fn prop_row(kind: i32, q: vec2f, period: f32, shift: f32, scale: f32) -> vec2f {
     return best;
 }
 
-// The far skyline: 0 hills, 1 mountains, 2 dunes, 3 blocky steps, 4 battlements, 5 a wall with arched windows,
-// 6 a cave, 7 planets, 8 none, 9 Lineland's striped domes.
+// The far skyline: 0 hills, 1 mountains, 2 dunes, 3 blocky steps, 4 battlements, 5 glowing arched windows,
+// 6 a cave, 7 planets, 8 none, 9 Lineland's striped domes, 10 pixel mountains, 11 the Cragnons' rock spires,
+// 12 Sammer's pagodas, 13 a bank of clouds, 14 Mount Lineland's stepped cliffs, 15 pixel coral, 16 wooden mine
+// beams, 17 Gloam Valley's white blocks.
 fn sd_far(q: vec2f) -> vec2f {
     let shape = i32(fx.motif.y);
     let x = q.x;
@@ -769,10 +894,10 @@ fn sd_far(q: vec2f) -> vec2f {
         h = 130.0 + select(0.0, 16.0, fract(x / 36.0) < 0.5) + select(0.0, 70.0, fract(x / 320.0 + 0.1) < 0.18);
     } else if (shape == 5) {
         let period = 170.0;
-        let lx = x - (floor(x / period) + 0.5) * period;
-        let p = vec2f(lx, q.y);
-        let window = min(sd_box(p, vec2f(0.0, 120.0), vec2f(36.0, 60.0)), sd_circle(p, vec2f(0.0, 180.0), 36.0));
-        return vec2f(-window, 0.0);  // the wall is everywhere but its windows
+        let p = vec2f(x - (floor(x / period) + 0.5) * period, q.y);
+        let window = min(sd_box(p, vec2f(0.0, 130.0), vec2f(30.0, 55.0)), sd_circle(p, vec2f(0.0, 185.0), 30.0));
+        let frame = min(sd_box(p, vec2f(0.0, 130.0), vec2f(36.0, 55.0)), sd_circle(p, vec2f(0.0, 185.0), 36.0));
+        return vec2f(frame, select(1.0, 3.0, window < 0.0));  // glowing windows in their frames
     } else if (shape == 6) {
         let top = 300.0 - 50.0 * abs(sin(x * 0.021)) - 80.0 * pow(abs(sin(x * 0.013 + 0.7)), 6.0);
         let rocks = 30.0 + 18.0 * sin(x * 0.015);
@@ -791,51 +916,210 @@ fn sd_far(q: vec2f) -> vec2f {
             d = min(d, sd_ellipse(vec2f(x - (c + 0.5) * 120.0, q.y), vec2f(0.0), vec2f(64.0 + 14.0 * seed, 70.0 + 50.0 * seed)));
         }
         return vec2f(d, 0.0);
+    } else if (shape == 10) {
+        let px = floor(x / 16.0) * 16.0;
+        let t = abs(fract(px / 300.0) * 2.0 - 1.0);
+        let t2 = abs(fract(px / 190.0 + 0.3) * 2.0 - 1.0);
+        h = floor(max(40.0 + 170.0 * (1.0 - t), 30.0 + 110.0 * (1.0 - t2)) / 16.0) * 16.0;
+        return vec2f(q.y - h, select(0.0, 2.0, q.y > h - 24.0 && t < 0.3));  // snowy tips
+    } else if (shape == 11) {
+        var d = 1e5;
+        let cell = floor(x / 110.0);
+        for (var k = -1; k <= 1; k++) {
+            let c = cell + f32(k);
+            let seed = hash11(c + 9.0);
+            let lx = x - (c + 0.5 + (seed - 0.5) * 0.3) * 110.0;
+            let top = 150.0 + 150.0 * seed;
+            let w = 16.0 + 12.0 * hash11(c + 1.0);
+            d = min(d, min(sd_box(vec2f(lx, q.y), vec2f(0.0, top * 0.5), vec2f(w, top * 0.5)), sd_circle(vec2f(lx, q.y), vec2f(0.0, top), w)));
+        }
+        return vec2f(d, 0.0);
+    } else if (shape == 12) {
+        let period = 280.0;
+        let p = vec2f(x - (floor(x / period) + 0.5) * period, q.y);
+        let wall = sd_box(p, vec2f(0.0, 40.0), vec2f(140.0, 40.0));
+        let body = sd_box(p, vec2f(0.0, 90.0), vec2f(64.0, 90.0));
+        var roof = sd_peak(p, 150.0, 110.0, 60.0);
+        roof = min(roof, sd_peak(p, 200.0, 70.0, 46.0));
+        roof = min(roof, sd_seg(p, vec2f(0.0, 230.0), vec2f(0.0, 290.0), 4.0));
+        return sd_u(vec2f(min(wall, body), 0.0), vec2f(roof, 1.0));
+    } else if (shape == 13) {
+        var d = 1e5;
+        let cell = floor(x / 70.0);
+        for (var k = -1; k <= 1; k++) {
+            let c = cell + f32(k);
+            let seed = hash11(c + 5.0);
+            d = min(d, sd_circle(vec2f(x - (c + 0.5) * 70.0, q.y), vec2f(0.0, 20.0 + 25.0 * seed), 38.0 + 18.0 * seed));
+        }
+        return vec2f(d, 0.0);
+    } else if (shape == 14) {
+        let t = fract(x / 420.0);
+        h = 50.0 + floor(t * 7.0) * 30.0;
+        return vec2f(q.y - h, select(0.0, 2.0, q.y > h - 8.0));  // each step's lit top
+    } else if (shape == 15) {
+        let period = 130.0;
+        let cell = floor(x / period);
+        let seed = hash11(cell + 2.0);
+        let p = pixelate(vec2f(x - (cell + 0.5) * period, q.y), 8.0);
+        var d = sd_box(p, vec2f(0.0, 40.0 + 20.0 * seed), vec2f(10.0, 40.0 + 20.0 * seed));
+        d = min(d, sd_box(p, vec2f(-20.0, 70.0), vec2f(6.0, 22.0)));
+        d = min(d, sd_box(p, vec2f(-12.0, 52.0), vec2f(10.0, 4.0)));
+        d = min(d, sd_box(p, vec2f(20.0, 90.0 * (0.7 + seed * 0.5)), vec2f(6.0, 20.0)));
+        d = min(d, sd_box(p, vec2f(12.0, 66.0), vec2f(10.0, 4.0)));
+        return vec2f(d, 0.0);
+    } else if (shape == 16) {
+        let period = 260.0;
+        let p = vec2f(x - floor(x / period) * period, q.y);
+        var d = min(sd_box(p, vec2f(0.0, 200.0), vec2f(9.0, 200.0)), sd_box(p, vec2f(period, 200.0), vec2f(9.0, 200.0)));
+        d = min(d, sd_box(p, vec2f(period * 0.5, 230.0), vec2f(period * 0.5, 8.0)));
+        d = min(d, sd_seg(p, vec2f(0.0, 70.0), vec2f(period * 0.5, 222.0), 6.0));
+        d = min(d, sd_seg(p, vec2f(period, 70.0), vec2f(period * 0.5, 222.0), 6.0));
+        return vec2f(d, 0.0);
+    } else if (shape == 17) {
+        var d = 1e5;
+        let cell = floor(x / 210.0);
+        for (var k = -1; k <= 1; k++) {
+            let c = cell + f32(k);
+            let seed = hash11(c + 4.0);
+            let at = vec2f((c + 0.5) * 210.0, 50.0 + 60.0 * seed);
+            d = min(d, sd_box(q, at, vec2f(60.0 + 25.0 * seed, 50.0 + 40.0 * seed)) - 10.0);
+        }
+        return vec2f(d, 0.0);
     } else {
         return vec2f(1e5, 0.0);
     }
     return vec2f((q.y - h) * 0.8, 0.0);
 }
 
-fn sky_color(q: vec2f) -> vec3f {
-    var c = mix(fx.palette[1].rgb, fx.palette[0].rgb, smoothstep(0.0, 380.0, q.y));
+// The back card: the sky, or the room's back wall.
+//  0 plain, 1 Lineland's doodled sky, 2 stars, 3 round clouds, 4 bricks, 5 a pixel sky, 6 Outer Space's star
+//  shapes, 7 Castle Bleck's line art, 9 white paper, 10 the void, 11 the Overthere's circles, 12 cave rock,
+// 13 tree rings, 14 pixel water, 15 wallpaper, 16 a dark grid
+fn back_color(q: vec2f) -> vec3f {
     let motif = i32(fx.motif.x);
-    if (motif == 1 || motif == 3) {
+    let top = fx.palette[0].rgb;
+    let bottom = fx.palette[1].rgb;
+    let detail = fx.palette[8].rgb;
+    var c = mix(bottom, top, smoothstep(0.0, 380.0, q.y));
+    if (motif == 1) {  // outlined rectangle clouds and maths scribbles
+        let cell = floor(q / vec2f(170.0, 105.0));
+        let seed = hash21(cell);
+        let at = (cell + vec2f(0.5, 0.5) + (vec2f(seed, hash11(seed * 9.0)) - 0.5) * 0.4) * vec2f(170.0, 105.0);
+        let size = vec2f(30.0 + 22.0 * seed, 10.0 + 5.0 * seed);
+        var line = abs(sd_box(q, at, size)) - 1.1;
+        line = min(line, abs(sd_box(q, at + vec2f(12.0, 8.0), size * 0.8)) - 1.1);
+        let s = q - at - vec2f(-60.0, -30.0);
+        line = min(line, select(1e5, min(abs(s.x) - 1.0, abs(s.y) - 1.0), max(abs(s.x), abs(s.y)) < 5.0));  // a plus
+        c = mix(c, detail, (1.0 - smoothstep(-0.5, 0.8, line)) * 0.75 * step(80.0, q.y));
+    } else if (motif == 2 || motif == 6) {
+        if (motif == 6) {  // big dark star silhouettes
+            let cell = floor(q / 90.0);
+            let seed = hash21(cell + 3.0);
+            let at = (cell + 0.5 + (vec2f(seed, hash11(seed * 7.0)) - 0.5) * 0.5) * 90.0;
+            c = mix(c, detail, 1.0 - smoothstep(-0.5, 0.8, sd_star(q, at, 18.0 + 16.0 * seed, seed * 6.0)));
+        }
+        let cell = floor(q / 26.0);
+        let h = hash21(cell);
+        if (h > 0.86) {
+            let at = (cell + 0.25 + 0.5 * vec2f(h, hash11(h * 31.0))) * 26.0;
+            let twinkle = 0.6 + 0.4 * sin(fx.stage.y * 3.0 + h * 40.0);
+            c = mix(c, vec3f(1.0, 0.98, 0.88), (1.0 - smoothstep(0.6, 1.8, length(q - at))) * twinkle);
+        }
+    } else if (motif == 3 || motif == 5) {
+        var p = q;
+        if (motif == 5) {
+            p = pixelate(q, 8.0);
+            c = mix(bottom, top, floor(smoothstep(0.0, 380.0, p.y) * 6.0) / 6.0);  // banded, like a pixel sky
+        }
         let period = 230.0;
-        let x = q.x + fx.stage.y * 6.0;
+        let x = p.x + fx.stage.y * 6.0;
         let cell = floor(x / period);
         var d = 1e5;
         for (var k = -1; k <= 1; k++) {
             let seed = hash11(cell + f32(k) + 7.0);
-            let local = vec2f(x - (cell + f32(k) + 0.5) * period, q.y - 240.0 - 90.0 * seed);
-            if (motif == 1) {
-                d = min(d, sd_box(local, vec2f(0.0), vec2f(40.0 + 24.0 * seed, 11.0)) - 6.0);
-            } else {
-                d = min(d, stage_prop(10, local / 1.4, seed).x * 1.4);
-            }
+            let local = vec2f(x - (cell + f32(k) + 0.5) * period, p.y - 220.0 - 100.0 * seed);
+            d = min(d, stage_prop(10, local / 1.5, seed).x * 1.5);
         }
-        let cloud = 1.0 - smoothstep(-1.0, 0.5, d);
-        c = mix(c, vec3f(1.0, 1.0, 0.98), cloud * 0.92);
-    } else if (motif == 2) {
-        let cell = floor(q / 26.0);
-        let h = hash11(cell.x * 17.3 + cell.y * 5.1);
-        if (h > 0.88) {
-            let at = (cell + 0.25 + 0.5 * vec2f(h, hash11(h * 31.0))) * 26.0;
-            let twinkle = 0.6 + 0.4 * sin(fx.stage.y * 3.0 + h * 40.0);
-            c = mix(c, vec3f(1.0, 0.98, 0.85), (1.0 - smoothstep(0.6, 1.8, length(q - at))) * twinkle);
+        c = mix(c, detail, (1.0 - smoothstep(-1.0, 0.5, d)) * 0.95);
+        if (stage_style() == 3) {
+            let g = abs(fract(q / 16.0) - 0.5) * 16.0;
+            c = c * select(1.0, 0.94, min(g.x, g.y) < 0.6);
         }
+    } else if (motif == 4) {  // bricks, each a slightly different shade
+        let row = floor(q.y / 28.0);
+        let bx = (q.x + row * 28.0) / 56.0;
+        let shade = 0.92 + 0.12 * hash21(vec2f(floor(bx), row));
+        c = top * shade * (0.8 + 0.2 * smoothstep(0.0, 300.0, q.y));
+        let mortar = min(fract(bx) * 56.0, fract(q.y / 28.0) * 28.0) < 2.5;
+        c = select(c, bottom, mortar);
+    } else if (motif == 7) {  // white line art on black
+        let period = 250.0;
+        let lx = q.x - (floor(q.x / period) + 0.5) * period;
+        let kink = clamp(q.y - 200.0, 0.0, 60.0);
+        var line = abs(lx - 60.0 + kink) - 1.2;
+        line = min(line, abs(lx + 80.0) - 1.0);
+        let center = vec2f((floor(q.x / 520.0) + 0.5) * 520.0 + 110.0, 300.0);
+        line = min(line, min(sd_ring(q, center, 40.0, 1.0), sd_ring(q, center, 28.0, 1.0)));
+        line = min(line, abs(sd_diamond(q, center, 40.0)) - 1.0);
+        c = mix(c, detail, 1.0 - smoothstep(0.0, 1.2, max(line, -1.0)));
+    } else if (motif == 9) {  // paper
+        c = c * (0.985 + 0.015 * noise(floor(q * 0.7)));
+    } else if (motif == 10) {  // the void: purple swirls with dark squares drifting
+        let swirl = 0.5 + 0.5 * sin(q.x * 0.012 + sin(q.y * 0.017) * 2.0 + fx.stage.y * 0.2);
+        c = mix(bottom, top, clamp(swirl * smoothstep(0.0, 300.0, q.y + 80.0), 0.0, 1.0));
+        let cell = floor((q + vec2f(fx.stage.y * 4.0, 0.0)) / 64.0);
+        let seed = hash21(cell);
+        if (seed > 0.55) {
+            let at = (cell + 0.5) * 64.0 - vec2f(fx.stage.y * 4.0, 0.0);
+            c = select(c, detail, sd_box(q, at, vec2f(4.0 + 10.0 * seed)) < 0.0);
+        }
+    } else if (motif == 11) {  // the Overthere's drawn circles
+        let cell = floor(q / 200.0);
+        let seed = hash21(cell + 1.0);
+        let at = (cell + 0.5) * 200.0 + (vec2f(seed, hash11(seed * 3.0)) - 0.5) * 60.0;
+        let ring = min(sd_ring(q, at, 30.0 + 40.0 * seed, 0.9), sd_ring(q, at, 18.0 + 25.0 * seed, 0.9));
+        c = mix(c, detail, (1.0 - smoothstep(0.0, 1.0, ring)) * 0.7);
+    } else if (motif == 12) {  // cave rock: rounded stones with dark seams
+        let cell = floor(q / 34.0);
+        let local = q - (cell + 0.5) * 34.0 + (vec2f(hash21(cell), hash21(cell + 7.0)) - 0.5) * 8.0;
+        let stone = sd_box(local, vec2f(0.0), vec2f(12.0, 12.0)) - 4.0;
+        c = select(bottom, mix(top, detail, hash21(cell + 2.0) * 0.6), stone < 0.0);
+    } else if (motif == 13) {  // the inside of a tree: rings
+        let r = length((q - vec2f(0.0, 260.0)) * vec2f(1.0, 1.3));
+        let band = floor(fract(r / 36.0) * 3.0);
+        c = mix(top, bottom, band / 2.0);
+    } else if (motif == 14) {  // pixel water
+        let p = pixelate(q, 8.0);
+        c = mix(bottom, top, floor(smoothstep(0.0, 380.0, p.y) * 5.0) / 5.0);
+        let cell = floor(p / vec2f(56.0, 24.0));
+        if (hash21(cell) > 0.65 && fract(p.y / 24.0) < 0.34 && fract(p.x / 56.0) < 0.4) {
+            c = detail;
+        }
+    } else if (motif == 15) {  // wallpaper with a wainscot
+        let stripe = fract(q.x / 44.0);
+        let diamond = abs(stripe - 0.5) * 44.0 + abs(fract(q.y / 44.0) - 0.5) * 44.0 < 9.0;
+        c = select(top, mix(top, detail, 0.35), diamond);
+        c = select(c, bottom, q.y < 80.0);
+        c = select(c, detail * 0.8, abs(q.y - 80.0) < 3.0);
+    } else if (motif == 16) {  // a dark grid
+        let g = abs(fract(q / 24.0) - 0.5) * 24.0;
+        c = select(c, detail, min(g.x, g.y) < 0.9);
     }
     return c;
 }
 
-// Signed distance of card i at stage point q (negative inside) and which colour.
-fn card_sd(i: i32, q: vec2f) -> vec2f {
+// Signed distance of card i at stage point q (negative inside) and which part.
+fn card_sd(i: i32, q0: vec2f) -> vec2f {
     if (is_test_stage()) {
         return vec2f(1e5, 0.0);
     }
+    var q = q0;
+    if (stage_style() == 3) {
+        q = pixelate(q0, 4.0);
+    }
     if (i == 0) {  // wings: big props framing the sides, like a stage set
         let hw = 0.5 * fx.screen.x / fx.screen.y * 480.0;
-        let kind = i32(fx.motif.z);
+        let kind = i32(fx.motif3.y);
         let l = stage_prop(kind, (q - vec2f(-hw + 26.0, 0.0)) / 1.8, 0.3);
         let r = stage_prop(kind, (q - vec2f(hw - 26.0, 0.0)) / 1.8, 0.8);
         return vec2f(min(l.x, r.x) * 1.8, select(r.y, l.y, l.x < r.x));
@@ -881,7 +1165,7 @@ fn card_at(q: vec2f) -> Card {
     }
     let lift = card_lift(4);
     let src = vec2f(q.x, q.y / max(lift, 0.001));
-    if (lift > 0.001 && src.y < fx.stage.z * 480.0 + 24.0) {  // the sky card reaches just past the top
+    if (lift > 0.001 && src.y < fx.stage.z * 480.0 + 24.0) {  // the back card reaches just past the top
         return Card(4, src, 0.0, -1.0);
     }
     return Card(5, q, 0.0, 0.0);
@@ -889,31 +1173,51 @@ fn card_at(q: vec2f) -> Card {
 
 fn card_color(card: Card) -> vec3f {
     if (card.index == 4) {
-        return select(sky_color(card.q), test_room(from_stage(card.q)), is_test_stage());
+        return select(back_color(card.q), test_room(from_stage(card.q)), is_test_stage());
     }
+    let style = stage_style();
+    let glow = card.part > 2.5;
     let colors = array<vec3f, 4>(fx.palette[3].rgb * 0.8, fx.palette[4].rgb, fx.palette[3].rgb, fx.palette[2].rgb);
-    var c = select(colors[card.index], fx.palette[7].rgb, card.part > 0.5 && card.part < 1.5);
-    if (card.part > 1.5) {
-        c = min(c * 1.22 + 0.03, vec3f(1.0));
+    var c = colors[card.index];
+    if (card.part > 0.5 && card.part < 1.5) {
+        c = fx.palette[7].rgb;
+    } else if (card.part > 1.5 && card.part < 2.5) {
+        c = min(c * 1.22 + 0.04, vec3f(1.0));
+    } else if (glow) {
+        c = fx.palette[9].rgb;
     }
-    if (card.index == 3 && i32(fx.motif.y) == 9) {
-        c = c * select(1.0, 1.08, fract(card.q.x / 16.0) < 0.35);  // the domes' stripes
+    if (!glow && style != 1) {
+        // Darker at the foot, the far skyline a little hazy, a touch of paper grain.
+        c = c * (0.84 + 0.16 * smoothstep(0.0, 160.0, card.q.y));
+        if (card.index == 3) {
+            c = mix(c, fx.palette[1].rgb, 0.12);
+        }
+        if (card.index == 3 && i32(fx.motif.y) == 9) {
+            c = c * select(1.0, 1.08, fract(card.q.x / 16.0) < 0.35);  // the domes' stripes
+        }
+        if (card.index == 3 && i32(fx.motif.y) == 14) {
+            c = c * select(1.0, 0.9, fract(card.q.x / 12.0 + card.q.y / 24.0) < 0.3);  // the cliffs' strata
+        }
+        c = c * (0.98 + 0.03 * noise(floor(card.q * 1.5)));
     }
-    // Darker at the foot, the far skyline a little hazy, a touch of paper grain.
-    c = c * (0.84 + 0.16 * smoothstep(0.0, 160.0, card.q.y));
-    if (card.index == 3) {
-        c = mix(c, fx.palette[1].rgb, 0.15);
-    }
-    c = c * (0.98 + 0.03 * noise(floor(card.q * 1.5)));
-    // A white paper edge around each cut-out, brightest while it rises.
-    let edge = smoothstep(-2.8, -1.6, card.d);
     let settle = mix(0.9, 0.7, smoothstep(0.9, 1.5, fx.stage.y));
-    return mix(c, vec3f(0.97, 0.97, 0.94), edge * settle);
+    if (style == 1) {  // line art: black cards outlined in white
+        return mix(c, fx.palette[8].rgb, smoothstep(-2.6, -1.4, card.d));
+    }
+    if (style == 2) {  // neon: dark cards with glowing edges
+        let edge = smoothstep(-3.5, -0.8, card.d);
+        return mix(c, fx.palette[9].rgb, edge);
+    }
+    if (style == 3) {  // pixel art: a dark outline instead of a cut edge
+        return mix(c, c * 0.62, step(-4.0, card.d) * select(1.0, 0.0, glow));
+    }
+    // Paper: a white edge around each cut-out, brightest while it rises.
+    return mix(c, vec3f(0.97, 0.97, 0.94), smoothstep(-2.8, -1.6, card.d) * settle);
 }
 
 // Nearer cards drop a soft shadow down-right onto the farther ones.
 fn card_shadow(q: vec2f, card: Card) -> f32 {
-    if (card.index == 0 || card.index >= 5) {
+    if (card.index == 0 || card.index >= 5 || stage_style() == 1) {
         return 1.0;
     }
     var occ = 0.0;
@@ -931,6 +1235,8 @@ fn card_shadow(q: vec2f, card: Card) -> f32 {
 }
 
 // The ground block's front face below the walking line.
+//  0 grass, 1 bricks, 2 checker, 3 sand, 4 tiles, 5 rock, 6 wooden planks, 7 cloud, 8 a white line on black,
+//  9 pixel grass on bricks, 10 stone slabs
 fn ground_color(q: vec2f) -> vec3f {
     if (is_test_stage()) {
         return test_room(from_stage(q));
@@ -939,17 +1245,25 @@ fn ground_color(q: vec2f) -> vec3f {
     let pattern = i32(fx.motif2.x);
     let top = fx.palette[5].rgb;
     let face = fx.palette[6].rgb;
-    let lip = select(7.0, select(6.0, 10.0, fract(q.x / 16.0) < 0.5), pattern == 0);  // grass: blocky teeth
+    var lip = 7.0;
+    if (pattern == 0 || pattern == 9) {
+        lip = select(6.0, 11.0, fract(q.x / 16.0) < 0.5);  // blocky grass teeth
+    } else if (pattern == 7) {
+        lip = 10.0 + 6.0 * abs(sin(q.x * 0.06));
+    } else if (pattern == 8) {
+        lip = 2.0;
+    }
     if (depth < lip) {
         return top;
     }
     var c = face;
     if (pattern == 0) {  // earth in bands
         c = face * select(1.0, 0.9, fract(depth / 26.0) < 0.5);
-    } else if (pattern == 1) {  // bricks
-        let row = floor(depth / 20.0);
-        let bx = fract((q.x + row * 20.0) / 40.0) * 40.0;
-        let by = fract(depth / 20.0) * 20.0;
+    } else if (pattern == 1 || pattern == 9) {  // bricks
+        let size = select(vec2f(40.0, 20.0), vec2f(32.0, 16.0), pattern == 9);
+        let row = floor(depth / size.y);
+        let bx = fract((q.x + row * size.x * 0.5) / size.x) * size.x;
+        let by = fract(depth / size.y) * size.y;
         c = select(face, face * 0.72, bx < 2.0 || by < 2.0);
     } else if (pattern == 2) {  // checker
         let cell = floor(vec2f(q.x, depth) / 24.0);
@@ -959,6 +1273,19 @@ fn ground_color(q: vec2f) -> vec3f {
     } else if (pattern == 4) {  // big tiles
         let g = abs(fract(vec2f(q.x, depth) / 48.0) - 0.5) * 48.0;
         c = select(face, face * 0.75, min(g.x, g.y) < 1.2);
+    } else if (pattern == 6) {  // planks
+        let row = floor(depth / 14.0);
+        let seam = fract((q.x + hash11(row) * 120.0) / 120.0) * 120.0 < 2.0 || fract(depth / 14.0) * 14.0 < 1.5;
+        c = select(face * (0.94 + 0.08 * hash11(row + 3.0)), face * 0.7, seam);
+    } else if (pattern == 7) {  // cloud
+        c = mix(top, face, smoothstep(lip, lip + 60.0, depth));
+    } else if (pattern == 8) {
+        c = face;
+    } else if (pattern == 10) {  // stone slabs
+        let row = floor(depth / 32.0);
+        let bx = fract((q.x + row * 32.0) / 64.0) * 64.0;
+        c = select(face * (0.95 + 0.08 * hash21(vec2f(floor((q.x + row * 32.0) / 64.0), row))), face * 0.7,
+                   bx < 2.0 || fract(depth / 32.0) * 32.0 < 2.0);
     } else {  // rock
         let cell = floor(vec2f(q.x, depth) / 22.0);
         let h = hash11(cell.x * 13.1 + cell.y * 7.7);
@@ -1123,7 +1450,7 @@ fn test_room(uv: vec2f) -> vec3f {
     var stageRays = 1.0;
     if (fx.stage.x > 0.5) {
         // Softer in battle: the fighters stand right in the light.
-        stageRays = select(0.0, 0.5 * card_lift(4), fx.stage.x > 1.5 && fx.stage.x < 2.5 && !is_test_stage());
+        stageRays = select(0.0, 0.5 * card_lift(4), fx.stage.x > 1.5 && fx.stage.x < 2.5 && fx.motif3.z > 0.5);
     }
     let open = stats.open * fx.sun.w * stageRays;
     if (fx.misc.w > 0.0 && open > 0.001) {

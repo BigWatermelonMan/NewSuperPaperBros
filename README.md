@@ -41,14 +41,16 @@ Touching an enemy no longer trades stomp damage. It starts a TTYD-style turn-bas
 
 Each battle draws a green-and-black zigzag border onto the screen, in SPM's digital style. A **pop-up paper
 diorama of the area** then stands up behind the fighters, made of that area's typical scenery rather than a copy of
-the spot. There are 16 area presets, from Lineland Road and Yold Desert to Outer Space and Castle Bleck. The lighting
-stays on in battle: the fighters drop shadows onto the diorama, the stage floor is glossy, and sun rays shine
+the spot. There are 23 presets, one for each area: Lineland Road's block trees and doodled sky, Gloam Valley's curly
+vines on white paper, the Bitlands in pixel art, the Underwhere in neon outlines, Castle Bleck in white line art, and
+so on. Blocks, switches and items lying in the field are put away during the fight and come back when it ends. The
+lighting stays on in battle: the fighters drop shadows onto the diorama, the stage floor is glossy, and sun rays shine
 through outdoor skies.
 
 | | |
 |---|---|
 | ![Battle intro: the zigzag border draws on and the diorama pops up](screenshots/lost-pages/battle-intro.png) | ![A Lineland Road battle](screenshots/lost-pages/battle-lineland.png) |
-| ![A Yold Desert battle diorama](screenshots/lost-pages/battle-yold.png) | ![The 16 area dioramas](screenshots/lost-pages/battle-presets.png) |
+| ![A Yold Desert battle diorama](screenshots/lost-pages/battle-yold.png) | ![The 23 area dioramas](screenshots/lost-pages/battle-presets.png) |
 
 ### Test area
 
