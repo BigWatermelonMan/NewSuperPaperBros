@@ -1,5 +1,7 @@
 # New Super Paper Bros.
 
+(This section written by me, a human.) FORK - [Super Paper Mario Deluxe + The Lost Pages. This fork will include lots of content on my idea of a proper remaster of SPM. Please be patient!]
+
 A native PC port of **Super Paper Mario** (Wii, 2007), made by statically recompiling the game's PowerPC code to C++
 with [WiiCompiled](https://github.com/patchzyy/Wiicompiled). No emulator: the game runs as a Windows or Linux program.
 
