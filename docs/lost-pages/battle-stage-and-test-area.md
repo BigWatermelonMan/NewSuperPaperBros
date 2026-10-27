@@ -2,6 +2,35 @@
 
 Press **F10 at the in-game title screen** to enter the test area. During normal play, F10 still opens settings.
 
+## Story battles (F5)
+
+In the test area, **F5** opens the story battle menu. It is driven with Up/Down and Enter, or the D-pad and A;
+Esc or B closes it, and the game gets no input while it's open. Each entry sets the story (GSW0) to just before
+the fight, refills Mario's HP and loads the fight's map through the entrance the story uses. The original intro
+scene plays, then the turn-based battle, then whatever the story does next, as in a normal playthrough. Leaving
+the test room ends the test session, so the normal badge collection applies again.
+
+| Battle | Map | Entrance | GSW0 | Notes |
+|---|---|---|---|---|
+| O'Chunks (1-3) | `he3_04` | default | 33 | The intro starts on arrival; the battle starts his theme, `BGM_BTL_DODONTAS1`. |
+| Fracktail (1-4) | `he4_10` | `dokan_1` (the pipe from `he4_09`) | 51 | Walk into the arena to wake him. |
+
+Each finished boss battle is added to `StoryBattles()` in `lp_testarea.cpp`.
+
+For automated runs:
+
+* `SPM_LP_TEST_STORY_BATTLE=n` picks entry n.
+* `tools/test-lost-pages-title.py` takes `SPM_LP_TEST_KEYS=10:F5,12:DOWN,15:RETURN`, which posts real keys to the
+  private window that many seconds after the test area opens.
+* Verified 2026-10-27:
+  * `autotest/story5`: O'Chunks from the menu, through intro, battle and victory to the cleared arena.
+  * `autotest/story4`: Fracktail from the menu, through the full intro (WARNING, Fracktail rising, Dimentio) into
+    the battle. The run ended mid-fight on time.
+
+Enhanced effects stay on all the way through: the test room keeps its floor reflections and shadows, and so do
+the story maps and their battles. `he4_10` now counts as outdoor, so Fracktail's desert arena gets sun rays; the
+rest of `he4` (the ruins) stays indoor.
+
 The room uses green-and-white checker and grid blanks over Lineland's existing room collision. It spawns Goomba,
 Koopa Troopa, Sproing-Oing, Squiglet and Piranha Plant using the game's enemy templates. More test subjects can be
 added to `kRoster` in `lp_testarea.cpp`. F10 → Graphics → Lost Pages offers **Reset test area and enemies** between

@@ -40,6 +40,30 @@ p = subprocess.Popen([str(play / 'SuperPaperMario.exe')], cwd=str(play), env=env
 start = time.monotonic()
 shot = 0
 sent_f10 = False
+# SPM_LP_TEST_KEYS=8:F5,10:DOWN,13:RETURN posts those keys to the private window that many seconds after the
+# test area opens (the F5 story battle menu and the like).
+KEYS = {'F5': (0x74, 0x3F), 'UP': (0x26, 0x148), 'DOWN': (0x28, 0x150), 'RETURN': (0x0D, 0x1C), 'ESCAPE': (0x1B, 0x01)}
+pending_keys = sorted((float(t), name) for t, name in
+                      (item.split(':') for item in os.environ.get('SPM_LP_TEST_KEYS', '').split(',') if item))
+test_area_at = None
+
+
+def post_key(vk, scan):
+    import ctypes
+    from ctypes import wintypes
+    user = ctypes.windll.user32
+    user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    extended = 1 << 24 if scan & 0x100 else 0
+
+    def send(hwnd, _):
+        owner = wintypes.DWORD()
+        user.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == p.pid and user.IsWindowVisible(hwnd):
+            user.PostMessageW(hwnd, 0x0100, vk, 1 | ((scan & 0xFF) << 16) | extended)
+            user.PostMessageW(hwnd, 0x0101, vk, 1 | ((scan & 0xFF) << 16) | extended | (3 << 30))
+        return True
+    user.EnumWindows(callback_type(send), 0)
 while time.monotonic() - start < seconds:
     time.sleep(1.0)
     t = time.monotonic() - start
@@ -62,6 +86,15 @@ while time.monotonic() - start < seconds:
             user.EnumWindows(callback_type(send_key), 0)
             sent_f10 = True
             print('Sent F10 to private title window', flush=True)
+    if pending_keys:
+        if test_area_at is None:
+            log.flush()
+            if 'opening the test area' in (out / 'run.err.log').read_text(errors='replace'):
+                test_area_at = t
+        while test_area_at is not None and pending_keys and t - test_area_at >= pending_keys[0][0]:
+            _, name = pending_keys.pop(0)
+            post_key(*KEYS[name])
+            print(f'Sent {name} at {t:.0f} s', flush=True)
     if t > 6:
         sweep.capture(p.pid, out / 'shots' / f't{int(t):03d}.bmp')
 p.kill()

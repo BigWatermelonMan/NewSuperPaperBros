@@ -62,4 +62,16 @@ uint32_t GameString(const char* text) {
     return found;
 }
 
+uint32_t PersistentString(Guest& g, const char* text) {
+    static std::unordered_map<std::string, uint32_t> copies;
+    if (const uint32_t found = GameString(text)) return found;
+    if (auto it = copies.find(text); it != copies.end()) return it->second;
+    const uint32_t size = static_cast<uint32_t>(std::strlen(text) + 1);
+    const uint32_t copy = g.Call(0x801A5634, {0, size});  // __memAlloc(heap 0)
+    if (!Memory::Contains(copy, size)) return 0;
+    for (uint32_t i = 0; i < size; ++i) Memory::Write8(copy + i, static_cast<uint8_t>(text[i]));
+    copies.emplace(text, copy);
+    return copy;
+}
+
 }  // namespace LostPages

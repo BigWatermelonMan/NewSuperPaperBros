@@ -371,7 +371,7 @@ if __name__ == '__main__':
     ap.add_argument('--disc', type=Path, help='Extracted disc (DATA folder); default Disc/DATA. PAL: --disc Disc_PAL/DATA --exe Play/SuperPaperMarioPAL.exe')
     ap.add_argument('--maps', help='Comma-separated map names; default is every map file')
     ap.add_argument('--limit', type=int)
-    ap.add_argument('--seconds', type=int, default=3, choices=range(1, 61))
+    ap.add_argument('--seconds', type=int, default=3, choices=range(1, 301))  # long story scenes (boss intros) need minutes
     ap.add_argument('--self-test', action='store_true')
     args = ap.parse_args()
     if args.self_test:

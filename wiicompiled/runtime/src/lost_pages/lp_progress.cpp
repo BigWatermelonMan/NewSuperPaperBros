@@ -1,20 +1,24 @@
 #include "lp_progress.h"
+#include "lp_badge_system.h"
 
 #include <algorithm>
 #include <cmath>
 
 namespace LostPages {
 
-// Layout of MarioPouchWork+0x0, unused by the game and saved with the pouch: magic, level, star points, version.
+// Layout of MarioPouchWork+0x0, unused by the game and saved with the pouch:
+// 0x4D magic, 7-bit level, 7-bit Star Points, 10-bit badge profile token. Old 0x4C saves migrate on write.
 constexpr uint8_t kMagic = 0x4C;  // 'L'
-constexpr uint8_t kVersion = 1;
 
 Progress LoadProgress(Guest& g) {
     const uint32_t pouch = g.PouchPtr();
     Progress p;
     if (!Memory::Contains(pouch, 0x20)) return p;
     const uint32_t word = Memory::Read32(pouch + Pouch::lostPages);
-    if ((word >> 24) == kMagic) {
+    if ((word >> 24) == 0x4D) {
+        p.level = std::clamp<int>((word >> 17) & 0x7F, 1, kMaxLevel);
+        p.starPoints = std::clamp<int>((word >> 10) & 0x7F, 0, kStarPointsPerLevel - 1);
+    } else if ((word >> 24) == kMagic) {
         p.level = std::clamp<int>((word >> 16) & 0xFF, 1, kMaxLevel);
         p.starPoints = std::clamp<int>((word >> 8) & 0xFF, 0, kStarPointsPerLevel - 1);
     } else {
@@ -28,10 +32,21 @@ Progress LoadProgress(Guest& g) {
 void SaveProgress(Guest& g, const Progress& p) {
     const uint32_t pouch = g.PouchPtr();
     if (!Memory::Contains(pouch, 0x20)) return;
-    const uint32_t word = (uint32_t{kMagic} << 24) | (static_cast<uint32_t>(p.level & 0xFF) << 16) |
-                          (static_cast<uint32_t>(p.starPoints & 0xFF) << 8) | kVersion;
+    const uint32_t previous = Memory::Read32(pouch + Pouch::lostPages);
+    const uint32_t profile = (previous >> 24) == 0x4D ? previous & 0x3FFu : 0u;
+    const uint32_t word = 0x4D000000u | (static_cast<uint32_t>(p.level & 0x7F) << 17) |
+                          (static_cast<uint32_t>(p.starPoints & 0x7F) << 10) | profile;
     Memory::Write32(pouch + Pouch::lostPages, word);
     Memory::Write32(pouch + Pouch::level, static_cast<uint32_t>(p.level));  // the pause menu shows it
+}
+
+bool PowerBounceEquipped(Guest& g) {
+    return BadgeEquipped(g,BadgeId::PowerBounce);
+}
+
+void SetPowerBounceEquipped(Guest& g, bool equipped) {
+    if (BadgeTesting()) GrantBadge(g,BadgeId::PowerBounce);
+    if (PowerBounceEquipped(g)!=equipped) { std::string reason; ToggleBadge(g,BadgeId::PowerBounce,reason); }
 }
 
 int EnemyLevel(int killXp, int attack, int maxHp) {
@@ -55,11 +70,14 @@ void ApplyLevelUp(Guest& g, LevelUpChoice choice) {
     if (choice == LevelUpChoice::Hp) {
         const int maxHp = static_cast<int32_t>(Memory::Read32(pouch + Pouch::maxHp));
         g.Call(Fn::pouchSetMaxHp, {static_cast<uint32_t>(maxHp + 5)});
-    } else {
+    } else if(choice==LevelUpChoice::Attack) {
         const int attack = static_cast<int32_t>(Memory::Read32(pouch + Pouch::attack));
         g.Call(Fn::pouchSetAttack, {static_cast<uint32_t>(attack + 1)});
+    } else {
+        auto& profile=Badges(g,true);profile.bp=std::min(99,profile.bp+3);
     }
-    g.Call(Fn::pouchSetHp, {Memory::Read32(pouch + Pouch::maxHp)});
+    g.Call(Fn::pouchSetHp, {static_cast<uint32_t>(BattleMaxHp(g))});
+    RecoverFp(g,BattleMaxFp(g));SaveBadges(g);
 }
 
 }  // namespace LostPages

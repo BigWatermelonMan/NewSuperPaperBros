@@ -19,7 +19,9 @@ extern "C" uint8_t* aurora_load_png_rgba(const char* path, uint32_t* width, uint
 #include "runtime_config.h"
 #include "display_settings.h"
 #include "lost_pages/lp_battle.h"
+#include "lost_pages/lp_progress.h"
 #include "lost_pages/lp_testarea.h"
+#include "lost_pages/lp_fracktail.h"
 #include <dolphin/gx/GXAurora.h>
 #include "runtime_log.h"
 #include "memory.h"
@@ -1253,6 +1255,7 @@ void DrawGraphicsSettings() {
     if (LostPages::TestAreaActive()) {
         ImGui::BeginDisabled(LostPages::BattleUiSnapshot().active);
         if (ImGui::Button("Reset test area and enemies")) LostPages::RequestTestArea();
+        if (ImGui::Button("Challenge Fracktail")) LostPages::RequestFracktailBattle();
         ImGui::EndDisabled();
     }
     if (bool battles = RuntimeConfigFile::TurnBasedBattles(true);
@@ -1858,7 +1861,7 @@ void PersistDisplayModeIfChanged() {
 
 void ApplyInputBlockState() {
     const bool blocked = controller_mapping_wizard::IsActive() || g_rebind.active ||
-                         g_exitPromptOpen || g_topBarVisible || StartupScreenVisible();
+                         g_exitPromptOpen || g_topBarVisible || StartupScreenVisible() || LostPages::StoryMenuOpen();
     PADBlockInput(blocked);
     InputBindings::SetInputBlocked(blocked);
 }
@@ -1925,6 +1928,31 @@ void HandleEvents(const AuroraEvent* events) noexcept {
             aurora_set_display_mode(mode);
             g_displayMode = static_cast<int>(aurora_get_display_mode());
             RuntimeConfigFile::SetDisplayMode(std::string(kDisplayModeConfigNames[static_cast<size_t>(g_displayMode)]));
+        }
+        // Lost Pages: F5 in the test area opens the story battle menu; while it's open it takes the input.
+        if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F5) && LostPages::TestAreaActive() &&
+            !LostPages::BattleUiSnapshot().active) {
+            LostPages::ToggleStoryMenu();
+            ApplyInputBlockState();
+        } else if (LostPages::StoryMenuOpen()) {
+            const bool down = ev->sdl.type == SDL_EVENT_KEY_DOWN && !ev->sdl.key.repeat;
+            const bool pad = ev->sdl.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+            const auto key = ev->sdl.key.scancode;
+            const auto button = ev->sdl.gbutton.button;
+            if ((down && key == SDL_SCANCODE_UP) || (pad && button == SDL_GAMEPAD_BUTTON_DPAD_UP))
+                LostPages::StoryMenuMove(-1);
+            if ((down && key == SDL_SCANCODE_DOWN) || (pad && button == SDL_GAMEPAD_BUTTON_DPAD_DOWN))
+                LostPages::StoryMenuMove(1);
+            if ((down && (key == SDL_SCANCODE_RETURN || key == SDL_SCANCODE_SPACE)) ||
+                (pad && button == SDL_GAMEPAD_BUTTON_SOUTH)) {
+                LostPages::StoryMenuConfirm();
+                ApplyInputBlockState();
+            }
+            if ((down && key == SDL_SCANCODE_ESCAPE) || (pad && button == SDL_GAMEPAD_BUTTON_EAST)) {
+                LostPages::ToggleStoryMenu();
+                ApplyInputBlockState();
+                continue;  // don't let Escape reach the top bar / quit prompt
+            }
         }
         // Lost Pages: on the title screen F10 opens the test area instead of the settings bar.
         uint32_t seqNow = 0;
@@ -2260,6 +2288,7 @@ void Draw() noexcept {
     NetplayUi::Draw();
     if (!StartupScreenVisible()) {
         LostPages::DrawBattleUi();
+        LostPages::DrawBadgesMenu();
     }
     DrawFpsOverlay();
     DrawTopBar();

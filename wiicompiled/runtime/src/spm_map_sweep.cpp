@@ -217,7 +217,7 @@ struct Sweep {
         }
         if (const char* value = std::getenv("SPM_MAP_SWEEP_SECONDS")) {
             const int seconds = std::atoi(value);
-            if (seconds >= 1 && seconds <= 60) dwellSeconds = seconds;
+            if (seconds >= 1 && seconds <= 300) dwellSeconds = seconds;
         }
         RT_LOGF(RT_TAG_RUNTIME, "[spmsweep] ready %zu maps dwell=%d\n", maps.size(), dwellSeconds);
     }
@@ -438,6 +438,7 @@ struct Sweep {
 // Lost Pages sun rays: rooms SPM sets indoors (towers, mansions, caves, castles, space, the Pit) never get
 // them, whatever the sky measurement says; their backdrops often look like open sky to the renderer.
 static float OutdoorHint(const std::string& map) {
+    if (map == "he4_10") return 1.0f;  // Fracktail's arena: open desert beyond the Yold Ruins
     static constexpr const char* kIndoor[] = {"mac", "dos", "dan", "bos", "mg", "ls", "sp", "mi2", "mi3", "mi4",
                                               "he4", "ta4", "gn3", "gn4"};
     for (const char* prefix : kIndoor) {

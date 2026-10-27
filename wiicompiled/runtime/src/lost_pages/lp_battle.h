@@ -18,6 +18,7 @@ enum class BattlePhase : uint8_t {
     Target,      // ...and an enemy
     ItemMenu,
     TacticsMenu,
+    MoveMenu,
     MarioAction, // Jump / Hammer / item / run, with action commands
     EnemyAction, // the enemies' turn, guard with timing
     Victory,     // Star Points tally
@@ -32,6 +33,7 @@ enum class UiPrompt : uint8_t {
     HoldLeft,    // hammer: hold left, release on the last star
     Mash,        // run away: mash A
     Guard,       // enemy attacking: A guard, B superguard
+    Stylish,
 };
 
 // What the overlay draws; the game thread fills it once per frame.
@@ -41,6 +43,9 @@ struct BattleUi {
         int hp = 0, maxHp = 0;
         bool alive = false;
         std::string name;
+        std::vector<std::string> statuses;
+        bool flying=false, spiky=false, fiery=false;
+        int defense=0;
     };
     struct Popup {
         float x = 0, y = 0;
@@ -57,6 +62,17 @@ struct BattleUi {
     Actor mario;
     std::vector<Actor> enemies;
     int hp = 0, maxHp = 0, attack = 0, level = 1, starPoints = 0;
+    bool powerBounce = false;
+    int jumpHits = 0;
+    int fp=0,maxFp=10,energy=0,round=1;
+    int bp=3,bpUsed=0;
+    std::string pickupNotice;
+    bool fracktail=false,weakPointOpen=false;
+    int glitchFrames=0;
+    bool revealHp=false,timingTutor=false;
+    int moveMenuType=0;
+    struct Effect {float x=0,y=0,tx=0,ty=0;int type=0,age=0,life=30;uint32_t color=0;};
+    std::vector<Effect> effects;
 
     int menuIndex = 0;  // Jump, Hammer, Items, Tactics
     int targetIndex = -1;

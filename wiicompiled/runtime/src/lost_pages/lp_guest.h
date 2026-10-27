@@ -106,5 +106,8 @@ extern float g_lastGroundY;
 // Address of a NUL-terminated copy of `text` in the game's own read-only data (found once, cached), so
 // functions that keep the pointer (marioChgPose) never see it go away. 0 if the game has no such string.
 uint32_t GameString(const char* text);
+// Like GameString, but copies the text to a permanent game-heap string when the game has none (pose names of
+// animations the code never names itself). 0 if the heap is full.
+uint32_t PersistentString(Guest& g, const char* text);
 
 }  // namespace LostPages

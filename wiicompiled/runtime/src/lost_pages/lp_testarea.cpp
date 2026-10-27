@@ -6,6 +6,7 @@
 #include "runtime_log.h"
 
 #include <array>
+#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 
@@ -32,6 +33,11 @@ bool g_inMap = false;
 int g_mapFrames = 0;
 bool g_spawned = false;
 std::vector<std::string> g_roster;
+
+// The F5 story battle menu: the overlay opens it and moves the cursor; the game thread carries out a pick.
+std::atomic<bool> g_storyMenu{false};
+std::atomic<int> g_storySelection{0};
+std::atomic<int> g_storyPick{-1};
 
 uint32_t Gp() {
     uint32_t gp = 0;
@@ -90,8 +96,35 @@ void RequestTestArea() { g_requested = true; }
 bool TestAreaActive() { return g_session && g_inMap; }
 std::vector<std::string> TestAreaRoster() { return g_roster; }
 
+const std::vector<StoryBattle>& StoryBattles() {
+    static const std::vector<StoryBattle> battles{
+        {"O'Chunks", "1-3  Yold Desert", "he3_04", nullptr, 33,
+         "Shoulder Bash, Ground Pound, Grab 'n' Toss. Thoreau can toss him."},
+        {"Fracktail", "1-4  Yold Ruins", "he4_10", "dokan_1", 51,
+         "Throw Frackles with Thoreau to lower the head, then hit the antenna."},
+    };
+    return battles;
+}
+
+void ToggleStoryMenu() {
+    if (!g_storyMenu && !TestAreaActive()) return;
+    g_storyMenu = !g_storyMenu;
+}
+bool StoryMenuOpen() { return g_storyMenu && TestAreaActive(); }
+int StoryMenuSelection() { return g_storySelection; }
+void StoryMenuMove(int delta) {
+    const int n = static_cast<int>(StoryBattles().size());
+    g_storySelection = ((g_storySelection + delta) % n + n) % n;
+}
+void StoryMenuConfirm() {
+    if (!StoryMenuOpen()) return;
+    g_storyPick = g_storySelection.load();
+    g_storyMenu = false;
+}
+
 // Which area's diorama a battle in `map` gets (the presets in aurora's scene_fx.cpp).
 int StagePresetFor(const std::string& map) {
+    if(map=="he4_10")return 3; // Fracktail's outdoor desert arena, beyond the interior ruins
     static constexpr std::pair<const char*, int> kAreas[] = {
         {"he1", 1}, {"he2", 2}, {"he3", 3}, {"he4", 4},    // Lineland Road, Mount Lineland, Yold Desert, Yold Ruins
         {"mi1", 5}, {"mi4", 7}, {"mi", 6},                // Gloam Valley, the mansion's basement, Merlee's Mansion
@@ -108,14 +141,14 @@ int StagePresetFor(const std::string& map) {
     return 22;  // Flipside, Flopside and the rest
 }
 
-void SetStage(Guest& g, int mode, const Vec3& floorPoint) {
+void SetStage(Guest& g, int mode, const Vec3& floorPoint, float efbHeight) {
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     g.ScreenPos({0.f, floorPoint.y, floorPoint.z}, x0, y0);
     g.ScreenPos({100.f, floorPoint.y + 100.f, floorPoint.z}, x1, y1);
     float fx = 0, fy = 0;
     g.ScreenPos(floorPoint, fx, fy);
-    // marioGetScreenPos measures y on the 528-line EFB; the stage works in the 480-line picture.
-    constexpr float kEfbToPicture = 480.f / 528.f;
+    // Use the battle camera's EFB coordinates, then convert to the 480-line overlay.
+    const float kEfbToPicture = 480.f / efbHeight;
     y0 *= kEfbToPicture;
     y1 *= kEfbToPicture;
     fy *= kEfbToPicture;
@@ -123,6 +156,10 @@ void SetStage(Guest& g, int mode, const Vec3& floorPoint) {
     // SPM_LP_STAGE_PRESET=n shows that area's diorama in every battle (for testing the presets).
     static const char* forced = std::getenv("SPM_LP_STAGE_PRESET");
     const int preset = forced ? std::atoi(forced) : TestAreaActive() ? 0 : StagePresetFor(CurrentMap());
+    static int probes = 0;
+    if (std::getenv("SPM_LP_STAGE_LOG") && mode == 2 && probes++ < 120)
+        RT_LOGF(RT_TAG_RUNTIME, "[lpstage] %d mode %d efb %.0f floor %.1f v %.4f units %.3f %.3f preset %d\n",
+                probes, mode, efbHeight, fy, fy / 480.f, unitX, unitY, preset);
     aurora_set_scene_fx_stage(mode, fy / 480.f, x0, unitX != 0.f ? unitX : 1.f, unitY != 0.f ? unitY : 1.f, preset);
 }
 
@@ -164,6 +201,30 @@ void TestAreaFieldTick(Guest& g) {
     }
     if (!g_inMap) return;
     ++g_mapFrames;
+    // SPM_LP_TEST_STORY_BATTLE=n picks story battle n (from 1) once the room is up (automated runs).
+    static const char* autoPick = std::getenv("SPM_LP_TEST_STORY_BATTLE");
+    static bool autoPicked = false;
+    if (autoPick && !autoPicked && g_mapFrames == 90) {
+        autoPicked = true;
+        g_storyPick = std::clamp(std::atoi(autoPick) - 1, 0, static_cast<int>(StoryBattles().size()) - 1);
+    }
+    if (const int pick = g_storyPick.exchange(-1); pick >= 0) {
+        // Leave the test room for the story: the fight's map at its intro, with Mario at full HP.
+        const StoryBattle& battle = StoryBattles()[pick];
+        const uint32_t gp = Gp(), name = GameString(battle.map);
+        if (gp && name) {
+            g_session = g_inMap = false;
+            g_roster.clear();
+            g_storyMenu = false;
+            aurora_set_scene_fx_stage(0, 0.8f, 0.f, 1.f, 1.f, 0);
+            Memory::Write32(gp + kGpGsw0, static_cast<uint32_t>(battle.gsw0));
+            g.Call(Fn::pouchSetHp, {g.Call(0x8014C9F4)});  // pouchGetMaxHp
+            g.Call(Fn::seqSetSeq, {kSeqMapChange, name, battle.entrance ? GameString(battle.entrance) : 0u});
+            RT_LOGF(RT_TAG_RUNTIME, "[lptest] story battle %s: %s at GSW0 %d\n", battle.boss, battle.map, battle.gsw0);
+            return;
+        }
+        RT_LOGF(RT_TAG_RUNTIME, "[lptest] can't open story battle %s (map name %08X)\n", battle.boss, name);
+    }
     g.Call(Fn::mapDispOff);  // cheap, and the map may turn itself back on during loading
     const uint32_t mario = g.MarioPtr();
     if (!Memory::Contains(mario, 0x130)) return;
