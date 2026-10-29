@@ -1,5 +1,7 @@
 #include "lp_testarea.h"
 #include "lp_battle.h"
+#include "lp_badge_system.h"
+#include "lp_progress.h"
 
 #include <aurora/gfx.h>
 
@@ -32,12 +34,25 @@ bool g_session = false;  // entered through the title screen, still in the test 
 bool g_inMap = false;
 int g_mapFrames = 0;
 bool g_spawned = false;
+bool g_storyTest = false;  // an F5 story battle is under way
 std::vector<std::string> g_roster;
 
 // The F5 story battle menu: the overlay opens it and moves the cursor; the game thread carries out a pick.
 std::atomic<bool> g_storyMenu{false};
 std::atomic<int> g_storySelection{0};
 std::atomic<int> g_storyPick{-1};
+std::atomic<bool> g_cutsceneList{false};  // the open menu shows Cutscenes() (F6)
+std::atomic<int> g_cutscenePick{-1};
+// The F7 level picker; the game thread applies a confirmed level.
+std::atomic<bool> g_levelPicker{false};
+std::atomic<int> g_levelPick{1};
+std::atomic<int> g_levelApply{-1};
+// After an F6 warp: the scene to set up once its room is loaded.
+struct Arrival {
+    int index = -1;
+    int waited = 0;  // frames waiting for the room
+    int frames = 0;  // frames in the room
+} g_arrival;
 
 uint32_t Gp() {
     uint32_t gp = 0;
@@ -94,6 +109,20 @@ void SpawnRoster(Guest& g) {
 
 void RequestTestArea() { g_requested = true; }
 bool TestAreaActive() { return g_session && g_inMap; }
+bool StoryTestRun() { return g_storyTest; }
+
+void ReturnToTestArea(Guest& g) {
+    const uint32_t gp = Gp(), name = GameString(kTestMap);
+    if (!gp || !name) return;
+    Memory::Write32(gp + kGpGsw0, static_cast<uint32_t>(kTestGsw0));
+    g_session = true;
+    g_inMap = false;
+    g_mapFrames = 0;
+    g_spawned = false;
+    g_storyTest = false;
+    g.Call(Fn::seqSetSeq, {kSeqMapChange, name, 0});
+    RT_LOGF(RT_TAG_RUNTIME, "[lptest] back to the test area\n");
+}
 std::vector<std::string> TestAreaRoster() { return g_roster; }
 
 const std::vector<StoryBattle>& StoryBattles() {
@@ -102,25 +131,79 @@ const std::vector<StoryBattle>& StoryBattles() {
          "Shoulder Bash, Ground Pound, Grab 'n' Toss. Thoreau can toss him."},
         {"Fracktail", "1-4  Yold Ruins", "he4_10", "dokan_1", 51,
          "Throw Frackles with Thoreau to lower the head, then hit the antenna."},
+        {"Count Bleck", "8-4  Castle Bleck", "ls4_11", nullptr, 410,
+         "Three protected turns, the Pure Hearts arrive, strike the barrier to break it, then fight."},
+        {"Super Dimentio", "8-4  The Final Battle", "ls4_11", nullptr, 411,
+         "His entrance, three barrier turns, \"You can't defeat me!\", then the real fight."},
     };
     return battles;
 }
 
+const std::vector<Cutscene>& Cutscenes() {
+    static const std::vector<Cutscene> scenes{
+        {"The Void destroys Sammer's Kingdom", "6  Sammer's Kingdom", "wa1_02", nullptr, 279, 0.f, 0x80D7B34Cu,
+         "\"We're too late?!\" Ends with Mario's E_3 / E_4 (in place of T_7)."},
+    };
+    return scenes;
+}
+
 void ToggleStoryMenu() {
     if (!g_storyMenu && !TestAreaActive()) return;
+    if (!g_storyMenu) g_storySelection = 0;
+    g_cutsceneList = false;
     g_storyMenu = !g_storyMenu;
 }
+void ToggleCutsceneMenu() {
+    if (!g_storyMenu && !TestAreaActive()) return;
+    if (!g_storyMenu) g_storySelection = 0;
+    g_cutsceneList = true;
+    g_storyMenu = !g_storyMenu;
+}
+bool CutsceneMenu() { return g_cutsceneList; }
 bool StoryMenuOpen() { return g_storyMenu && TestAreaActive(); }
 int StoryMenuSelection() { return g_storySelection; }
 void StoryMenuMove(int delta) {
-    const int n = static_cast<int>(StoryBattles().size());
+    const int n = static_cast<int>(g_cutsceneList ? Cutscenes().size() : StoryBattles().size());
     g_storySelection = ((g_storySelection + delta) % n + n) % n;
 }
 void StoryMenuConfirm() {
     if (!StoryMenuOpen()) return;
-    g_storyPick = g_storySelection.load();
+    (g_cutsceneList ? g_cutscenePick : g_storyPick) = g_storySelection.load();
     g_storyMenu = false;
 }
+
+void ToggleLevelPicker(int currentLevel) {
+    if (!g_levelPicker && !TestAreaActive()) return;
+    if (!g_levelPicker) g_levelPick = std::clamp(currentLevel, 1, kMaxLevel);
+    g_storyMenu = false;
+    g_levelPicker = !g_levelPicker;
+}
+bool LevelPickerOpen() { return g_levelPicker && TestAreaActive(); }
+int LevelPickerLevel() { return g_levelPick; }
+void LevelPickerMove(int delta) { g_levelPick = std::clamp(g_levelPick.load() + delta, 1, kMaxLevel); }
+void LevelPickerConfirm() {
+    if (!LevelPickerOpen()) return;
+    g_levelApply = g_levelPick.load();
+    g_levelPicker = false;
+}
+
+namespace {
+// Mario as if he had levelled up to `level` from a new game (10 HP, 1 ATK, 3 BP), choosing HP, ATK, BP in turn.
+void ApplyTestLevel(Guest& g, int level) {
+    const uint32_t pouch = g.PouchPtr();
+    if (!Memory::Contains(pouch, 0x20)) return;
+    const int ups = level - 1;
+    const int hp = 10 + 5 * ((ups + 2) / 3), attack = 1 + (ups + 1) / 3, bp = std::min(99, 3 + 3 * (ups / 3));
+    SaveProgress(g, {level, 0});
+    g.Call(Fn::pouchSetMaxHp, {static_cast<uint32_t>(hp)});
+    g.Call(Fn::pouchSetAttack, {static_cast<uint32_t>(attack)});
+    Badges(g, true).bp = bp;
+    g.Call(Fn::pouchSetHp, {static_cast<uint32_t>(BattleMaxHp(g))});
+    RecoverFp(g, BattleMaxFp(g));
+    SaveBadges(g);
+    RT_LOGF(RT_TAG_RUNTIME, "[lptest] level %d: max HP %d, ATK %d, BP %d\n", level, hp, attack, bp);
+}
+}  // namespace
 
 // Which area's diorama a battle in `map` gets (the presets in aurora's scene_fx.cpp).
 int StagePresetFor(const std::string& map) {
@@ -141,6 +224,9 @@ int StagePresetFor(const std::string& map) {
     return 22;  // Flipside, Flopside and the rest
 }
 
+std::atomic<int> g_battlePreset{-1};
+void SetBattleStagePreset(int preset) { g_battlePreset = preset; }
+
 void SetStage(Guest& g, int mode, const Vec3& floorPoint, float efbHeight) {
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     g.ScreenPos({0.f, floorPoint.y, floorPoint.z}, x0, y0);
@@ -155,7 +241,8 @@ void SetStage(Guest& g, int mode, const Vec3& floorPoint, float efbHeight) {
     const float unitX = (x1 - x0) / 100.f, unitY = (y0 - y1) / 100.f;
     // SPM_LP_STAGE_PRESET=n shows that area's diorama in every battle (for testing the presets).
     static const char* forced = std::getenv("SPM_LP_STAGE_PRESET");
-    const int preset = forced ? std::atoi(forced) : TestAreaActive() ? 0 : StagePresetFor(CurrentMap());
+    const int own = g_battlePreset;
+    const int preset = forced ? std::atoi(forced) : own >= 0 && mode == 2 ? own : TestAreaActive() ? 0 : StagePresetFor(CurrentMap());
     static int probes = 0;
     if (std::getenv("SPM_LP_STAGE_LOG") && mode == 2 && probes++ < 120)
         RT_LOGF(RT_TAG_RUNTIME, "[lpstage] %d mode %d efb %.0f floor %.1f v %.4f units %.3f %.3f preset %d\n",
@@ -168,6 +255,7 @@ void TestAreaTitleTick(CpuContext* ctx) {
     uint32_t seq = 0;
     if (!Memory::TryRead32(0x8056D0D8u, seq)) return;
     const bool resetVisit = seq == 2 && TestAreaActive() && !BattleUiSnapshot().active;
+    if (seq == kSeqTitle) g_storyTest = false;  // back at the title: a fresh game
     if (seq != kSeqTitle && !resetVisit) return;
     static int titleFrames = 0;
     if (autoStart && seq == kSeqTitle && ++titleFrames == 20) g_requested = true;
@@ -208,12 +296,40 @@ void TestAreaFieldTick(Guest& g) {
         autoPicked = true;
         g_storyPick = std::clamp(std::atoi(autoPick) - 1, 0, static_cast<int>(StoryBattles().size()) - 1);
     }
+    // SPM_LP_TEST_CUTSCENE=n picks cutscene n (from 1) the same way.
+    static const char* autoScene = std::getenv("SPM_LP_TEST_CUTSCENE");
+    static bool autoScenePicked = false;
+    if (autoScene && !autoScenePicked && g_mapFrames == 90) {
+        autoScenePicked = true;
+        g_cutscenePick = std::clamp(std::atoi(autoScene) - 1, 0, static_cast<int>(Cutscenes().size()) - 1);
+    }
+    // SPM_LP_TEST_LEVEL=n applies level n once the room is up (automated runs).
+    static const char* autoLevel = std::getenv("SPM_LP_TEST_LEVEL");
+    if (autoLevel && g_mapFrames == 60) g_levelApply = std::clamp(std::atoi(autoLevel), 1, kMaxLevel);
+    if (const int level = g_levelApply.exchange(-1); level > 0) ApplyTestLevel(g, level);
+    if (const int pick = g_cutscenePick.exchange(-1); pick >= 0) {
+        const Cutscene& scene = Cutscenes()[pick];
+        const uint32_t gp = Gp(), name = GameString(scene.map);
+        if (gp && name) {
+            g_session = g_inMap = false;
+            g_storyTest = true;  // a defeat on the way back still returns here
+            g_roster.clear();
+            g_storyMenu = false;
+            aurora_set_scene_fx_stage(0, 0.8f, 0.f, 1.f, 1.f, 0);
+            Memory::Write32(gp + kGpGsw0, static_cast<uint32_t>(scene.gsw0));
+            g_arrival = {pick, 0, 0};
+            g.Call(Fn::seqSetSeq, {kSeqMapChange, name, scene.entrance ? GameString(scene.entrance) : 0u});
+            RT_LOGF(RT_TAG_RUNTIME, "[lptest] cutscene %s: %s at GSW0 %d\n", scene.name, scene.map, scene.gsw0);
+            return;
+        }
+    }
     if (const int pick = g_storyPick.exchange(-1); pick >= 0) {
         // Leave the test room for the story: the fight's map at its intro, with Mario at full HP.
         const StoryBattle& battle = StoryBattles()[pick];
         const uint32_t gp = Gp(), name = GameString(battle.map);
         if (gp && name) {
             g_session = g_inMap = false;
+            g_storyTest = true;
             g_roster.clear();
             g_storyMenu = false;
             aurora_set_scene_fx_stage(0, 0.8f, 0.f, 1.f, 1.f, 0);
@@ -234,6 +350,29 @@ void TestAreaFieldTick(Guest& g) {
     }
     const Vec3 pos = ReadVec3(mario + Mario::position);
     SetStage(g, 3, {pos.x, g_lastGroundY, pos.z});
+}
+
+void CutsceneArrivalTick(Guest& g) {
+    if (g_arrival.index < 0) return;
+    const Cutscene& scene = Cutscenes()[g_arrival.index];
+    if (g.Call(Fn::seqGetSeq) != 2 || CurrentMap() != scene.map) {
+        if (++g_arrival.waited > 60 * 60) g_arrival.index = -1;  // never arrived
+        return;
+    }
+    const int f = ++g_arrival.frames;
+    const uint32_t mario = g.MarioPtr();
+    if (!Memory::Contains(mario, 0x70)) return;
+    if (f == 120) Memory::WriteFloat32(mario + Mario::position, scene.marioX);
+    if (f == 180) {
+        // The room may have started the scene on its own when Mario landed on its trigger; never run it twice.
+        if (Memory::Read8(mario + Mario::keyOff) == 0) {
+            const uint32_t entry = g.Call(0x800D8D58, {scene.script, 0xEF, 0});  // evtEntry
+            RT_LOGF(RT_TAG_RUNTIME, "[lptest] cutscene %s started (%08X)\n", scene.name, entry);
+        } else {
+            RT_LOGF(RT_TAG_RUNTIME, "[lptest] cutscene %s started by the room\n", scene.name);
+        }
+        g_arrival.index = -1;
+    }
 }
 
 }  // namespace LostPages

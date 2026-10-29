@@ -1,4 +1,4 @@
-# Local modding notes
+﻿# Local modding notes
 
 ## 2026-10-24: native Badges pause-menu integration (USA)
 
@@ -194,3 +194,91 @@ The O'Chunks battle was silent (`spsndGetBgmName` returned garbage, nothing play
 Fracktail was checked too: `BGM_BTL_BOSS_STG1` plays throughout its battle. `SPM_LP_LOG_BGM=1` logs the playing track every 2 s during battles.
 
 Verified in `autotest/bgm-och2` (theme from start to victory, audio output non-zero) and `autotest/bgm-fr`. Installed.
+
+## 2026-10-28: review and battle presentation foundation
+
+Reviewed HEAD7a4b95c: O'Chunks rules/enrage/turn animation, original theme and native story handoff are implemented; F5 story list and input gate are present. Only the new boss-battles-plan.md was untracked before this work. The plan's statement about HUD hiding is not represented by explicit hudHide calls in lp_battle.cpp; native HUD integration needs a proper draw-hook investigation rather than assuming that mechanism.
+
+First implementation checkpoint: all battles use a76-frame intro with pixel/scanline full cover (18â€“34), diorama/map switch at28, slide-in42â€“66 and menu76; zigzag border draws after cover56. Existing boss BGM still starts immediately in Begin/BeginOChunks. Removed BATTLE and move/item/enemy attack-name banners; victory/defeat/escape/level-up remain. Fracktail instruction text/DEF labels removed; guard instructions require Timing Tutor. Left/Right controls command/move/item/tactics menus, with horizontal command row and selected-card carousel. Mario's S_1/bounce preserved; no pose surveys. HP/resource overlays remain until a verified native HUD replacement is ready.
+
+Remaining from the supplied plan: native HUD counters, replacement icons, native dialogue/Talk phase, Pure Shield/Special menu, Bleck and Super Dimentio battles/research, boss-specific effects and story-list additions. No placeholder final bosses have been added or claimed complete. No commit/push performed.
+
+Foundation validation: release compilation and git diff --check passed. transition-boss-foundation/shots/20.8.bmp shows the horizontal command row;28.bmp shows Right selecting Hammer and entering its carousel. transition-normal-roster/shots/17.4.bmp shows full-screen green/black cover;17.8.bmp the reveal;23.bmp retained victory banner;24.bmp field return;26.bmp another encounter. Normal autoplay completed a three-enemy battle and re-entered combat. Guard timing instructions are absent without Timing Tutor. The first he1_04 normal-map attempt did not reach an enemy (wall), and is not claimed as a combat test. Native HUD/resource replacement and all final-boss/dialogue work remain pending; existing stats panels intentionally retained until native replacements are verified.
+
+Installed presentation foundation with matching Play hashes. Backup: C:\Super Paper Mario The Lost Pages\NewSuperPaperBros\engine\backup-before-transition-menus-20261028-202704. Engine SHA256: 4100B394A5EE52E9E69CEB90F9AE6CC8B70B2605B1E0627D066BBEC286658177. Loader SHA256: E45885316F573EDF21FA3CF2A6DB5267F49A4C63D2ABC70D98D6B7C1490672A0. No commit or push.
+
+## 2026-10-28: review and final boss completion
+
+Reviewed the post-foundation changes and finished the remaining plan work.
+
+- Dialogue: one reusable `evt_msg_print` event (`USER_FUNC 0x5005C`) in heap-0, started after `evtStopAll`. `BattlePhase::Talk` waits for the native event to disappear. O'Chunks reuses `stg1_3_006` (intro), `stg1_3_013` (enrage) and `stg1_3_014` (defeat) with his `dodon` speaker bubble; Bleck uses `stg8_4_011`/`stg8_4_054`; Super Dimentio uses a direct line. The final bosses' generated actor names are not addressable, so their boxes are centered.
+- Bleck and Super Dimentio now start from the real story actors: Bleck at `ls4_11` GSW0 410 with tribe 305 and UW13 `0x80DEACF8`; Super Dimentio at GSW0 415 with tribe 309 and UW9 `0x80DED9A0`. Victory reloads GSW0 411/415, which runs each boss's own defeat scene. F5 entries remain 410 and 414.
+- Music corrected to the original evidence: Bleck `BGM_BTL_MR_ZIGEN1`, Super Dimentio `BGM_BTL_BOSS_LAST1`.
+- Attack controller fixes: phase 2 starts its own seven/six-attack cycle at index 0; dead mini-Luigi swarms are skipped; mini-Luigis use the swarm jump animation; Bleck's absorb uses the open-cape sequence; Void Sprite attacks use the void beam effect; Lover's Grief is offered only in Super Dimentio phase 2; Pure Shield is drawn around Mario, not the boss.
+- Native HUD review: a real callback collision (`0x817F0200` was shared with the Fracktail renderer) and a `func_8019933C` entry-state check were found. Fixing both made the callback run, but the battle diorama is a scene-fx pass over the guest EFB and still hides guest-drawn HUD rows. The working result is a compact native-style battle HUD (HP hearts, SP, FP, Energy, rainbow underline) plus the field SP/Lv/BP chip, drawn above the diorama. This does not claim the stock HUD row itself is visible in battle.
+- Rules and compile checks: pure final-boss rules PASS, badge/Fracktail/O'Chunks rules PASS, full translated release compile PASS.
+
+Validation:
+
+- Count Bleck F5 run: natural 410 gate, phase 1 invulnerability, phase 2, and reload to GSW0 411 with the native defeat scene (captured during review).
+- `autotest/final-special-smoke-2`: Super Dimentio phase 2, mini-Luigis (six 1-damage hits), Voidsplitter (24), swarm turn, and Lover's Grief. The story 414/415 gate was also observed in the review run.
+- `autotest/final-special-smoke-1/2`: Pure Shield reduced boss damage to 1 and Lover's Grief used the phase-2 Special entry.
+- `autotest/och-review-1`: O'Chunks intro dialogue used his native `stg1_3_006` line and the `dodon` bubble.
+- `autotest/post-clean-hud-1`: field HUD, SP/Lv/BP chip and test area remain intact after removing the guest HUD callback override.
+- `autotest/final-engine-check-3`: final engine loads, Super Dimentio uses the native multipart rig, the centered boss dialogue starts, and the phase 1 turn flow runs. The installed copy is byte-identical.
+
+Installed USA engine and loader with matching Play hashes. Backup: `engine/backup-before-final-bosses-20261028-220809`. Engine SHA256: 846D0FA7BDFD470A02216EE756FD548EBB473512545E54C1EB69B9B25E405E23. Loader SHA256: A614F9D120359DFB063141B731505952C0DDFD251C2EEA256BB8199B6862AFE3. No commit or push.
+
+Remaining limits: native HUD row cannot be composited above the battle diorama without an engine render-order change; the overlay is the current visible replacement. The full natural Chapter 8 route, every boss phase/turn combination and the final save-block/relaunch cycle were not exhaustively playtested.
+
+
+
+
+## 2026-10-29: boss battle review fixes
+
+Reviewed the uncommitted transition, menu, dialogue, HUD and final-boss work and fixed what was broken.
+
+- Story Bleck and Super Dimentio fight as the map's own actors (real models, size, animations; up to 64 parts collected). The rebuilt rig is only the fallback for `SPM_LP_TEST_FINAL_BOSS` and still draws the Void Sprites and mini-Luigis. Bleck plays A_1 (cast) and A_4 (cape, suction, swallow) by name. The boss camera pulls back to 0.92 for Super Dimentio so his face fits.
+- Boss HP is scaled to Mario's attack (`attack / 5`, 0.25–1, minimum 20) and boss hits to his max HP (`/ 40`, 0.3–1.2). The swarm lands `maxHp / 8` hits (2–6). Phase 2 of Super Dimentio opens with the swarm.
+- Reality Split: a B press outside a flash window jams dodging for 14 frames (no mashing). Both ultimates are telegraphed a turn ahead. The barrier now also blocks statuses.
+- The phase-2 line ends in `<k>`. O'Chunks' enrage line plays on the spot (a Talk that returns to his turn).
+- The final-boss gate re-arms after the actor has been gone for 60 frames.
+- Special is offered only in the final battles. The list carousel clamps to the game picture.
+- A defeat in the test area or in an F5 story battle (`StoryTestRun`) restores HP and returns to the test area instead of a game over.
+- The battle row (HP, FP, SP, ENERGY) and the field Star Points counter are drawn in the native HUD style (icon, coloured label, white value, zigzag underline), without the dark panel.
+
+Validation: rules tests PASS. `autotest/rev4-dimentio` and `rev6-dimentio`: F5 Super Dimentio, native actor, phase 2, swarm, Lover's Grief victory, native defeat scene at GSW0 415. `autotest/rev6-bleck`: F5 Bleck, native actor, phase 2, Void Sprites, Absorb, telegraphed Reality Split (autoplay didn't shield, so it lost). `rev3-*`: a test defeat returned to the test area. The 0.92 zoom has not been checked by eye; the rev6 captures only caught a corner of the window. Freed 77 GB of test-run Play copies; their logs were kept in each run's `logs`.
+
+Installed with matching hashes. Backup: `engine/backup-before-boss-review-20261029-090247`. No commit or push.
+
+## 2026-10-29: Sammer's Kingdom destruction pose swap
+
+At the end of the chapter 6 scene where The Void destroys Sammer's Kingdom (`wa1_02`, GSW0 279; the script at `0x80D7B34C` sets Mario's pose to T_7 at `0x80D7B7A8`, then GSW0 280), Mario now plays E_3 and then E_4 instead of T_7 (first S_2/S_3; the user corrected it). `lp_scene_poses.cpp` hooks `animPoseSetAnim` (`0x800432F8`). Script poses don't go through `marioChgPose`: `evt_mario_set_pose` writes Mario+0x1C and his model later applies `mario_<pose>`. Only `mario_T_7` is swapped, only in `wa1_02` at GSW0 279/280, and never in battle. `ScenePoseTick` moves on to E_4 when E_3 finishes.
+
+`tools/scene-sammer-destruction.py` jumps straight into the scene and records it:
+
+- `SPM_LP_RUN_EVT` starts the scene's script two seconds into the map, and `SPM_LP_RUN_EVT_X` first moves Mario where the camera can see him.
+- `SCENE_SHOT_STEP` sets the capture rate.
+- It writes a contact sheet and Mario's animation log (`SPM_LP_LOG_POSE`), then deletes its Play copy.
+
+Screenshots are per-monitor DPI aware again; after the display scaling changed, they had only caught the top-left of the window. Verified in `autotest/scene-sammer8` and `scene-sammer9` (log: T_7 -> S_2 -> S_3; GIFs in `scene-sammer9`). Installed; backup `engine/backup-before-t7-swap-20261029-095343`. No commit.
+
+## 2026-10-29: F6 cutscene teleporter
+
+In the test area, F6 opens the cutscene teleporter: the F5 menu, listing `Cutscenes()`. A pick warps to the scene's room at its GSW0, puts Mario at the scene's x, and starts the scene's script a second later if the room hasn't. A forced second copy of the Sammer scene asserted in `npcNameToPtr`, which is why the start waits.
+
+Verified with real F6 and Enter key presses (`autotest/f6-sammer1`): test area, warp to `wa1_02` at GSW0 279, scene, `T_7 -> E_3 -> E_4`, no crash; GIFs are in that folder. `tools/test-lost-pages-title.py` gained F6 and `SPM_TEST_SHOT_INTERVAL`. Installed; backup `engine/backup-before-f6-cutscenes-20261029-101111`. No commit.
+
+## 2026-10-29: boss story flow, HUD counter, sounds, level picker, final-boss stages
+
+- Star Points counter: shown only while the game's own HUD is up (HUD work at r13-0x7E00: flags 0x2000 = hidden, +0x24 = slide 0..150), Mario has control and no message window is open; it slides away with the HUD. Anchored to the HUD's centred 16:9 frame, right under the HP heart (it sat too far left in wide windows). `SPM_LP_LOG_HUD=1` logs the HUD state.
+- Sounds (the game's own SFX): menu cursor / open / confirm / back / refused, Mario's jump, attack shouts, hammer swing and hit, Nice, Stylish, enemy hits and blocks, Mario hurt, guard / superguard, enemy, boss and Fracktail attacks, Star Points, level up, escape, battle start.
+- Test area F7: level picker (Left/Right 1, Up/Down 10, Enter). Mario's HP/ATK/BP are rebuilt as if levelled up to it (HP, ATK, BP in turn). `SPM_LP_TEST_LEVEL=n` for runs.
+- Fracktail: the story dragon is drawn by its boss code's display callbacks (0x801DC434, 0x801DD8C8), not as an NPC; both are hooked and skipped once the battle cover is up (no second dragon). The battle now takes over as soon as his last line (stg1_4_012) closes, found by the intro event's argument pointer (0x80CF4A58..0x80CF4A90), before the dig.
+- Count Bleck, three phases: (1) three protected turns, then his AI's own barrier scene 0x8042F1F0 is run with his actor as "me" (evt+0x168) while his AI stays frozen: the Pure Hearts arrive; (2) the barrier still blocks, Mario's first strike on it runs the scene's second branch: the barrier breaks; (3) hurtable. Special (Pure Hearts) from phase 2 on. The barrier part (partswork 4>=1, 5==1) is hidden except for 50 frames after a block, when partswork 0 = 1 makes his actor play the barrier's own animation. evtStopAll every frame in final battles (our dialogue event is exempt) so his native attack scripts can't run on Mario's turn.
+- Super Dimentio: F5 now starts at GSW0 411 (412 directly asserts on the missing "nasta"). His first form (tribe 309, before the 415 callback) is the barrier battle; after three turns unitwork 1 is set to 2 and one real hit goes through, so the room plays "You can't defeat me!", Tippi and Bleck and the Pure Hearts; the 415 fight then starts in phase 2. No ordinary battles in ls4_11.
+- Count Bleck and Super Dimentio have their own battle dioramas (presets 24, 25): Bleck's line-art void with the Chaos Heart beating and floating Castle Bleck squares; Super Dimentio's harlequin vortex ringed in Luigi green with hovering dimension shards on a purple/yellow checker. `SetBattleStagePreset` overrides the area preset.
+
+Validation: `autotest/flow-bleck2` (all three Bleck phases, both scenes, victory, GSW0 411), `flow-bleck3` (barrier only on hits), `flow-dimentio2` (entrance, barrier battle, native scenes, 415 phase-2 fight; autoplay lost it and returned to the test area), `flow-frack3` (battle right after "CTRL ALT DEL!", one dragon), `flow-area1` (F7 to Lv 22: 45 HP / 8 ATK / 24 BP, counter under the HP heart), `stage-bleck2` / `stage-dimentio2` (new stages). A full Super Dimentio victory with the new flow was not played through. Sounds were not checked by ear (test runs are muted).
+
+Installed with matching hashes. Backup: `engine/backup-before-boss-flow-20261029-115231`. No commit.

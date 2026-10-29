@@ -19,6 +19,8 @@ enum class BattlePhase : uint8_t {
     ItemMenu,
     TacticsMenu,
     MoveMenu,
+    SpecialMenu,
+    Talk,
     MarioAction, // Jump / Hammer / item / run, with action commands
     EnemyAction, // the enemies' turn, guard with timing
     Victory,     // Star Points tally
@@ -67,10 +69,20 @@ struct BattleUi {
     int fp=0,maxFp=10,energy=0,round=1;
     int bp=3,bpUsed=0;
     std::string pickupNotice;
+    // Outside battle: whether the game's own HUD is up (not in a cutscene, dialogue, menu or hidden by a script),
+    // and how far it has slid out of view (0 shown .. 150 gone, HUD units), so the Star Points counter goes with it.
+    bool fieldHud=false;
+    float hudSlide=0;
+    // The level picker (test area, F7): open, and the level it shows.
+    bool levelPicker=false;
+    int levelPick=1;
     bool fracktail=false,weakPointOpen=false;
     int glitchFrames=0;
     bool revealHp=false,timingTutor=false;
     int moveMenuType=0;
+    bool hasSpecial=true,pureShield=false;
+    int finalBoss=0;
+    float whiteFlash=0;
     struct Effect {float x=0,y=0,tx=0,ty=0;int type=0,age=0,life=30;uint32_t color=0;};
     std::vector<Effect> effects;
 

@@ -103,6 +103,9 @@ static constexpr StagePreset StagePresets[] = {
   /* 21 Castle Bleck */ {7, 8, 21, 0, 8, 1, 0, 0, {{0, 0, 0}, {.02f, .02f, .03f}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {1, 1, 1}}},
   /* 22 Flipside and Flopside */ {4, 8, 26, 0, 10, 0, 0, 0, {{.52f, .4f, .32f}, {.4f, .3f, .24f}, {.5f, .5f, .5f}, {.36f, .3f, .22f}, {.4f, .4f, .4f}, {.48f, .5f, .38f}, {.36f, .38f, .3f}, {.3f, .26f, .2f}, {.5f, .5f, .5f}, {.62f, .86f, .58f}}},
   /* 23 The Pit of 100 Trials */ {0, 3, 0, 14, 1, 0, 0, 0, {{.8f, .77f, .62f}, {.7f, .68f, .54f}, {.16f, .14f, .13f}, {.5f, .5f, .5f}, {.18f, .16f, .15f}, {.6f, .34f, .36f}, {.48f, .26f, .28f}, {.3f, .3f, .3f}, {.5f, .5f, .5f}, {1, 1, 1}}},
+  // The two final battles have stages of their own (not their area's).
+  /* 24 Count Bleck */ {17, 18, 21, 22, 8, 1, 0, 0, {{.12f, .02f, .2f}, {.01f, 0, .03f}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {.35f, .1f, .5f}, {1, 1, 1}, {.72f, .22f, .96f}}},
+  /* 25 Super Dimentio */ {18, 19, 22, 0, 2, 2, 0, 0, {{.34f, .1f, .5f}, {.62f, .52f, .14f}, {.09f, .02f, .13f}, {.12f, .04f, .18f}, {.1f, .02f, .14f}, {.45f, .15f, .65f}, {.95f, .8f, .2f}, {.3f, .9f, .4f}, {1, 1, 1}, {.35f, 1, .45f}}},
 };
 // clang-format on
 
@@ -681,6 +684,15 @@ fn sd_peak(p: vec2f, base: f32, half: f32, height: f32) -> f32 {
 
 fn sd_diamond(p: vec2f, c: vec2f, s: f32) -> f32 { return (abs(p.x - c.x) + abs(p.y - c.y) - s) * 0.7071; }
 
+// A heart of size s centred at c: two lobes over a point.
+fn sd_heart(p: vec2f, c: vec2f, s: f32) -> f32 {
+    let d = (p - c) / s;
+    let lobes = min(sd_circle(d, vec2f(-0.48, 0.28), 0.55), sd_circle(d, vec2f(0.48, 0.28), 0.55));
+    return min(lobes, sd_diamond(d, vec2f(0.0, -0.15), 0.98)) * s;
+}
+
+fn rotate2(p: vec2f, a: f32) -> vec2f { return vec2f(p.x * cos(a) - p.y * sin(a), p.x * sin(a) + p.y * cos(a)); }
+
 // A five-pointed star.
 fn sd_star(p: vec2f, c: vec2f, r: f32, spin: f32) -> f32 {
     let d = p - c;
@@ -875,7 +887,8 @@ fn prop_row(kind: i32, q: vec2f, period: f32, shift: f32, scale: f32) -> vec2f {
 // The far skyline: 0 hills, 1 mountains, 2 dunes, 3 blocky steps, 4 battlements, 5 glowing arched windows,
 // 6 a cave, 7 planets, 8 none, 9 Lineland's striped domes, 10 pixel mountains, 11 the Cragnons' rock spires,
 // 12 Sammer's pagodas, 13 a bank of clouds, 14 Mount Lineland's stepped cliffs, 15 pixel coral, 16 wooden mine
-// beams, 17 Gloam Valley's white blocks.
+// beams, 17 Gloam Valley's white blocks, 18 Castle Bleck's floating squares (Count Bleck's battle), 19 shards of
+// broken dimensions (Super Dimentio's battle).
 fn sd_far(q: vec2f) -> vec2f {
     let shape = i32(fx.motif.y);
     let x = q.x;
@@ -985,6 +998,29 @@ fn sd_far(q: vec2f) -> vec2f {
             d = min(d, sd_box(q, at, vec2f(60.0 + 25.0 * seed, 50.0 + 40.0 * seed)) - 10.0);
         }
         return vec2f(d, 0.0);
+    } else if (shape == 18) {  // Castle Bleck's squares hanging in the void, stepping up and down like broken stairs
+        var d = 1e5;
+        let cell = floor(x / 64.0);
+        for (var k = -1; k <= 1; k++) {
+            let c = cell + f32(k);
+            let seed = hash11(c + 13.0);
+            let bob = 4.0 * sin(fx.stage.y * 0.9 + seed * 9.0);
+            let at = vec2f((c + 0.5) * 64.0, 70.0 + 130.0 * abs(sin(c * 0.55)) + 30.0 * seed + bob);
+            d = min(d, sd_box(q, at, vec2f(20.0 + 6.0 * seed)));
+        }
+        return vec2f(d, 0.0);
+    } else if (shape == 19) {  // jagged shards of broken dimensions, hovering and turning
+        var best = vec2f(1e5, 0.0);
+        let cell = floor(x / 150.0);
+        for (var k = -1; k <= 1; k++) {
+            let c = cell + f32(k);
+            let seed = hash11(c + 21.0);
+            let at = vec2f((c + 0.5) * 150.0 + (seed - 0.5) * 50.0, 140.0 + 150.0 * seed + 10.0 * sin(fx.stage.y * 1.1 + seed * 9.0));
+            let p = rotate2(q - at, (seed - 0.5) * 2.4 + 0.15 * sin(fx.stage.y * 0.7 + seed * 5.0));
+            let shard = max(sd_peak(p, -50.0 - 20.0 * seed, 24.0 + 14.0 * seed, 100.0 + 60.0 * seed), -sd_peak(p - vec2f(10.0, 0.0), -60.0, 10.0, 40.0));
+            best = sd_u(best, vec2f(shard, select(0.0, 2.0, hash11(c + 4.0) > 0.5)));
+        }
+        return best;
     } else {
         return vec2f(1e5, 0.0);
     }
@@ -994,7 +1030,8 @@ fn sd_far(q: vec2f) -> vec2f {
 // The back card: the sky, or the room's back wall.
 //  0 plain, 1 Lineland's doodled sky, 2 stars, 3 round clouds, 4 bricks, 5 a pixel sky, 6 Outer Space's star
 //  shapes, 7 Castle Bleck's line art, 9 white paper, 10 the void, 11 the Overthere's circles, 12 cave rock,
-// 13 tree rings, 14 pixel water, 15 wallpaper, 16 a dark grid
+// 13 tree rings, 14 pixel water, 15 wallpaper, 16 a dark grid, 17 the Chaos Heart over Count Bleck's void,
+// 18 Super Dimentio's harlequin vortex
 fn back_color(q: vec2f) -> vec3f {
     let motif = i32(fx.motif.x);
     let top = fx.palette[0].rgb;
@@ -1104,6 +1141,37 @@ fn back_color(q: vec2f) -> vec3f {
     } else if (motif == 16) {  // a dark grid
         let g = abs(fract(q / 24.0) - 0.5) * 24.0;
         c = select(c, detail, min(g.x, g.y) < 0.9);
+    } else if (motif == 17) {  // Count Bleck's battle: the Chaos Heart beating over a void of slowly turning squares
+        let glow = fx.palette[9].rgb;
+        let hc = vec2f(0.0, 215.0);
+        let swirl = 0.5 + 0.5 * sin(length(q - hc) * 0.03 - fx.stage.y * 0.8);
+        c = mix(bottom, top, swirl * smoothstep(-40.0, 380.0, q.y));
+        let cell = floor(q / 110.0);
+        let seed = hash21(cell + 11.0);
+        if (seed > 0.4) {
+            let at = (cell + 0.5) * 110.0 + (vec2f(seed, hash11(seed * 5.0)) - 0.5) * 40.0;
+            let r = rotate2(q - at, fx.stage.y * (0.2 + 0.3 * seed) + seed * 6.0);
+            let square = abs(sd_box(r, vec2f(0.0), vec2f(8.0 + 16.0 * seed))) - 0.9;
+            c = mix(c, detail, (1.0 - smoothstep(0.0, 1.0, square)) * 0.8);
+        }
+        let to = q - hc;
+        let rays = pow(abs(sin(atan2(to.y, to.x) * 8.0 + fx.stage.y * 0.5)), 6.0);
+        c = mix(c, glow * 0.6, (1.0 - smoothstep(0.0, 280.0, length(to))) * rays * 0.5);
+        let heart = sd_heart(q, hc, 58.0 * (1.0 + 0.05 * sin(fx.stage.y * 4.0)));
+        c = mix(c, glow, 1.0 - smoothstep(0.0, 14.0, heart));                        // its glow
+        c = mix(c, vec3f(0.03, 0.0, 0.05), 1.0 - smoothstep(-1.0, 0.5, heart));       // the dark heart
+        c = mix(c, detail, 1.0 - smoothstep(0.0, 1.2, abs(heart + 5.0) - 0.8));      // a white inner line
+    } else if (motif == 18) {  // Super Dimentio's battle: a turning harlequin vortex, ringed in Luigi green
+        let glow = fx.palette[9].rgb;
+        let to = q - vec2f(0.0, 190.0);
+        let r = length(to);
+        let a = atan2(to.y, to.x) + r * 0.006 - fx.stage.y * 0.3;
+        let checker = (i32(floor(a * 6.0 / 3.14159)) + i32(floor(r / 50.0 - fx.stage.y))) & 1;
+        c = select(top, bottom, checker == 1);
+        let ring = abs(fract(r / 120.0 - fx.stage.y * 0.2) - 0.5) * 120.0 - 2.0;
+        c = mix(c, glow, (1.0 - smoothstep(0.0, 6.0, ring)) * 0.7);
+        c = c * mix(0.4, 0.8, smoothstep(40.0, 420.0, r));  // kept dim so the fighters read against it
+        c = mix(c, vec3f(0.02, 0.0, 0.04), 1.0 - smoothstep(20.0, 70.0, r));          // the void at its eye
     }
     return c;
 }

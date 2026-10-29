@@ -36,6 +36,39 @@ bool StoryMenuOpen();
 int StoryMenuSelection();
 void StoryMenuMove(int delta);
 void StoryMenuConfirm();
+// True from an F5 pick until Mario is back in the test room: a defeat there returns to the room, no game over.
+bool StoryTestRun();
+void ReturnToTestArea(Guest& g);  // game thread
+
+// Cutscenes the test area teleports to (F6, the same menu as F5). Each warps to the scene's room at the story point
+// just before it, puts Mario where it starts, and starts its script if the room doesn't on its own.
+struct Cutscene {
+    const char* name;
+    const char* where;
+    const char* map;
+    const char* entrance;  // nullptr: the map's default
+    int gsw0;
+    float marioX;     // where Mario is put two seconds after arriving
+    uint32_t script;  // the scene's event script, started if no cutscene is running a second later
+    const char* about;
+};
+const std::vector<Cutscene>& Cutscenes();
+void ToggleCutsceneMenu();
+bool CutsceneMenu();  // the open menu lists cutscenes (F6) rather than story battles (F5)
+// From npcMain outside battle: places Mario and starts the scene after an F6 warp.
+void CutsceneArrivalTick(Guest& g);
+
+// The level picker (F7 in the test area): Left/Right +-1, Up/Down +-10, Enter applies. Mario's HP, ATK and BP are
+// rebuilt as if he had levelled up to it, the level-ups shared out HP, ATK, BP in turn. Any thread except the apply.
+void ToggleLevelPicker(int currentLevel);
+bool LevelPickerOpen();
+int LevelPickerLevel();
+void LevelPickerMove(int delta);
+void LevelPickerConfirm();
+
+// A battle's own diorama instead of its area's (the final bosses: kBleckStage, kDimentioStage); -1 clears it.
+constexpr int kBleckStage = 24, kDimentioStage = 25;
+void SetBattleStagePreset(int preset);
 
 // Battle stage / test room parameters for the renderer around a world point on the floor.
 void SetStage(Guest& g, int mode, const Vec3& floorPoint, float efbHeight=528.f);

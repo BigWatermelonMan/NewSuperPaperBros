@@ -1861,7 +1861,8 @@ void PersistDisplayModeIfChanged() {
 
 void ApplyInputBlockState() {
     const bool blocked = controller_mapping_wizard::IsActive() || g_rebind.active ||
-                         g_exitPromptOpen || g_topBarVisible || StartupScreenVisible() || LostPages::StoryMenuOpen();
+                         g_exitPromptOpen || g_topBarVisible || StartupScreenVisible() || LostPages::StoryMenuOpen() ||
+                         LostPages::LevelPickerOpen();
     PADBlockInput(blocked);
     InputBindings::SetInputBlocked(blocked);
 }
@@ -1929,11 +1930,41 @@ void HandleEvents(const AuroraEvent* events) noexcept {
             g_displayMode = static_cast<int>(aurora_get_display_mode());
             RuntimeConfigFile::SetDisplayMode(std::string(kDisplayModeConfigNames[static_cast<size_t>(g_displayMode)]));
         }
-        // Lost Pages: F5 in the test area opens the story battle menu; while it's open it takes the input.
+        // Lost Pages: F5 in the test area opens the story battle menu, F6 the cutscene teleporter; while one is
+        // open it takes the input.
         if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F5) && LostPages::TestAreaActive() &&
             !LostPages::BattleUiSnapshot().active) {
             LostPages::ToggleStoryMenu();
             ApplyInputBlockState();
+        } else if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F6) && LostPages::TestAreaActive() &&
+                   !LostPages::BattleUiSnapshot().active) {
+            // F6: the cutscene teleporter (the same menu, listing cutscenes).
+            LostPages::ToggleCutsceneMenu();
+            ApplyInputBlockState();
+        } else if (!g_rebind.active && IsToggleKey(ev->sdl, SDL_SCANCODE_F7) && LostPages::TestAreaActive() &&
+                   !LostPages::BattleUiSnapshot().active) {
+            // F7: the level picker.
+            LostPages::ToggleLevelPicker(LostPages::BattleUiSnapshot().level);
+            ApplyInputBlockState();
+        } else if (LostPages::LevelPickerOpen()) {
+            const bool down = ev->sdl.type == SDL_EVENT_KEY_DOWN;
+            const bool pad = ev->sdl.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+            const auto key = ev->sdl.key.scancode;
+            const auto button = ev->sdl.gbutton.button;
+            if ((down && key == SDL_SCANCODE_LEFT) || (pad && button == SDL_GAMEPAD_BUTTON_DPAD_LEFT)) LostPages::LevelPickerMove(-1);
+            if ((down && key == SDL_SCANCODE_RIGHT) || (pad && button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) LostPages::LevelPickerMove(1);
+            if ((down && key == SDL_SCANCODE_DOWN) || (pad && button == SDL_GAMEPAD_BUTTON_DPAD_DOWN)) LostPages::LevelPickerMove(-10);
+            if ((down && key == SDL_SCANCODE_UP) || (pad && button == SDL_GAMEPAD_BUTTON_DPAD_UP)) LostPages::LevelPickerMove(10);
+            if ((down && !ev->sdl.key.repeat && (key == SDL_SCANCODE_RETURN || key == SDL_SCANCODE_SPACE)) ||
+                (pad && button == SDL_GAMEPAD_BUTTON_SOUTH)) {
+                LostPages::LevelPickerConfirm();
+                ApplyInputBlockState();
+            }
+            if ((down && key == SDL_SCANCODE_ESCAPE) || (pad && button == SDL_GAMEPAD_BUTTON_EAST)) {
+                LostPages::ToggleLevelPicker(0);
+                ApplyInputBlockState();
+                continue;
+            }
         } else if (LostPages::StoryMenuOpen()) {
             const bool down = ev->sdl.type == SDL_EVENT_KEY_DOWN && !ev->sdl.key.repeat;
             const bool pad = ev->sdl.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;

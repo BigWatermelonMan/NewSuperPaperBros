@@ -42,7 +42,7 @@ shot = 0
 sent_f10 = False
 # SPM_LP_TEST_KEYS=8:F5,10:DOWN,13:RETURN posts those keys to the private window that many seconds after the
 # test area opens (the F5 story battle menu and the like).
-KEYS = {'F5': (0x74, 0x3F), 'UP': (0x26, 0x148), 'DOWN': (0x28, 0x150), 'RETURN': (0x0D, 0x1C), 'ESCAPE': (0x1B, 0x01)}
+KEYS = {'F5': (0x74, 0x3F), 'F6': (0x75, 0x40), 'F7': (0x76, 0x41), 'RIGHT': (0x27, 0x14D), 'UP': (0x26, 0x148), 'DOWN': (0x28, 0x150), 'RETURN': (0x0D, 0x1C), 'ESCAPE': (0x1B, 0x01)}
 pending_keys = sorted((float(t), name) for t, name in
                       (item.split(':') for item in os.environ.get('SPM_LP_TEST_KEYS', '').split(',') if item))
 test_area_at = None
@@ -64,8 +64,9 @@ def post_key(vk, scan):
             user.PostMessageW(hwnd, 0x0101, vk, 1 | ((scan & 0xFF) << 16) | extended | (3 << 30))
         return True
     user.EnumWindows(callback_type(send), 0)
+interval = float(os.environ.get('SPM_TEST_SHOT_INTERVAL', '1'))  # seconds between screenshots
 while time.monotonic() - start < seconds:
-    time.sleep(1.0)
+    time.sleep(interval)
     t = time.monotonic() - start
     if physical_f10 and not sent_f10:
         log.flush()
@@ -96,7 +97,7 @@ while time.monotonic() - start < seconds:
             post_key(*KEYS[name])
             print(f'Sent {name} at {t:.0f} s', flush=True)
     if t > 6:
-        sweep.capture(p.pid, out / 'shots' / f't{int(t):03d}.bmp')
+        sweep.capture(p.pid, out / 'shots' / (f't{int(t):03d}.bmp' if interval >= 1 else f't{t:07.2f}.bmp'))
 p.kill()
 p.wait()
 log.close()

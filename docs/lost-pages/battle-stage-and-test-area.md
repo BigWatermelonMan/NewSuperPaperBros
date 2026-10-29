@@ -17,6 +17,20 @@ the test room ends the test session, so the normal badge collection applies agai
 
 Each finished boss battle is added to `StoryBattles()` in `lp_testarea.cpp`.
 
+## Cutscene teleporter (F6)
+
+In the test area, **F6** opens the same menu, listing cutscenes instead of battles. A pick sets the story to the
+scene's point and warps to its room. Two seconds after arriving, Mario is placed where the scene plays. A second
+later the scene's own script starts, unless the room has already started it. A scene must never run twice: it
+asserts in `npcNameToPtr`.
+
+| Cutscene | Map | GSW0 | Mario x | Script |
+|---|---|---|---|---|
+| The Void destroys Sammer's Kingdom (6) | `wa1_02` | 279 | 0 | `0x80D7B34C` |
+
+Add scenes to `Cutscenes()` in `lp_testarea.cpp`. For automated runs, `SPM_LP_TEST_CUTSCENE=n` picks entry n, and
+`SPM_LP_TEST_KEYS=8:F6,11:RETURN` presses the keys for real.
+
 For automated runs:
 
 * `SPM_LP_TEST_STORY_BATTLE=n` picks entry n.

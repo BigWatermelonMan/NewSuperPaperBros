@@ -30,10 +30,18 @@ def capture(pid, path):
         import ctypes
         import ctypes.wintypes as w
         user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+        # Per-monitor DPI awareness, else GetClientRect is DPI-scaled and the shot is a top-left crop of the window
+        # (the plain system-aware call isn't enough when the display's scaling changes after sign-in, e.g. over a
+        # remote session).
         try:
-            user32.SetProcessDPIAware()  # else GetClientRect is DPI-scaled and the shot is a top-left crop of the window
+            user32.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+            if not user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):  # PER_MONITOR_AWARE_V2
+                user32.SetProcessDPIAware()
         except Exception:
-            pass
+            try:
+                user32.SetProcessDPIAware()
+            except Exception:
+                pass
         user32.GetDC.restype = w.HDC
         user32.GetDC.argtypes = [w.HWND]
         user32.ReleaseDC.argtypes = [w.HWND, w.HDC]
